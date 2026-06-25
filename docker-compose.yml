@@ -1,0 +1,94 @@
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aria
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aria"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:postgres@postgres:5432/aria
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+
+  supabase-api:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      postgrest:
+        condition: service_started
+    volumes:
+      - ./docker/nginx/supabase-api.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "54321:80"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/aria
+      REDIS_URL: redis://redis:6379
+      SUPABASE_URL: http://supabase-api
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmlhLWxvY2FsIiwicm9sZSI6ImFub24iLCJleHAiOjIwOTY1NTM4NzB9.ld9E267J8E57iWNHzidNk9Atz4utQrfTOgnsBRuhEJk
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmlhLWxvY2FsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MjA5NjU1Mzg3MH0.vENtg09irzo8Fc-e9fJ9_QvIYh7WPRzdI7-ZIWfIngo
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+      # Keep Turbopack cache on the container filesystem — bind-mounting .next from
+      # Windows causes route-manifest corruption and 404s on pages/API routes.
+      - app_next_cache:/app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      supabase-api:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_node_modules:
+  app_next_cache:

@@ -1,0 +1,34 @@
+/* Scoped Clerk overrides for the split auth layout */
+.auth-clerk .cl-card,
+.auth-clerk .cl-cardBox,
+.auth-clerk .cl-rootBox,
+.auth-clerk .cl-main {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.auth-clerk .cl-formFieldInput {
+  border-radius: 9999px;
+}
+
+.auth-clerk .cl-dividerText {
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.auth-clerk .cl-formFieldAction {
+  text-align: center;
+  width: 100%;
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.auth-clerk .cl-socialButtonsIconButton {
+  border-radius: 9999px;
+}
+
+.auth-clerk .cl-footer {
+  display: none;
+}

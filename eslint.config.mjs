@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // ARIA reference UI prototypes (raw design exports, not part of the app).
+    "_aria_ui/**",
   ]),
 ]);
 

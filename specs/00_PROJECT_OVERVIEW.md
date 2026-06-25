@@ -9,7 +9,7 @@ Monzi is a **SaaS multi-agent AI platform** that allows non-technical users (lam
 to create specialized AI agents with avatars, connect their apps, and get a 360° 
 dashboard view of their entire digital ecosystem — all controlled by conversational AI.
 
-Think: **Notion + Jarvis + HubSpot dashboard** — but driven by AI agents.
+Think: **Notion + conversational AI + HubSpot dashboard** — but driven by AI agents.
 
 ---
 

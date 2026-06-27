@@ -8,12 +8,12 @@ import {
   MessageSquarePlus,
   Mic,
   Phone,
-  RotateCcw,
   Send,
   Square,
   X,
 } from "lucide-react";
 
+import { ChatErrorNotice } from "@/components/aria/agents/chat-error-notice";
 import { AgentSelector } from "@/components/aria/agents/agent-selector";
 import {
   AssistantMessage,
@@ -25,10 +25,10 @@ import {
   VoiceHologramOverlay,
   type VoiceOverlayPhase,
 } from "@/components/aria/voice/voice-hologram-overlay";
-import { useAgentSpeech } from "@/hooks/use-agent-speech";
+import { useElevenLabsVoiceSession } from "@/hooks/use-elevenlabs-voice-session";
+import { writeVoiceModePreference } from "@/lib/voice/preferences";
 import { useChatHistory } from "@/hooks/use-chat-history";
 import { useInvalidateDashboards } from "@/hooks/use-dashboards";
-import { usePushToTalk } from "@/hooks/use-push-to-talk";
 import { useAgents } from "@/hooks/use-agents";
 import { useUIStore } from "@/lib/store/ui-store";
 import { agentGradient } from "@/lib/aria/mock-data";
@@ -42,31 +42,22 @@ function messageText(message: UIMessage): string {
     .join("");
 }
 
-const VOICE_FAREWELL_PHRASES = [
-  "goodbye",
-  "good bye",
-  "bye bye",
-  "bye",
-  "stop",
-  "stop listening",
-  "that's all",
-  "thats all",
-  "thanks bye",
-  "thank you bye",
-  "see you",
-  "talk later",
-  "end session",
-  "cancel",
-];
-
-function isVoiceFarewell(text: string): boolean {
-  const normalized = text.trim().toLowerCase().replace(/[.!?,]+$/, "");
-  return VOICE_FAREWELL_PHRASES.some(
-    (phrase) =>
-      normalized === phrase ||
-      normalized.startsWith(`${phrase} `) ||
-      normalized.endsWith(` ${phrase}`)
-  );
+function mapVoiceSessionPhase(
+  state: ReturnType<typeof useElevenLabsVoiceSession>["state"]
+): VoiceOverlayPhase {
+  switch (state) {
+    case "greeting":
+      return "greeting";
+    case "listening":
+    case "user-speaking":
+      return "listening";
+    case "speaking":
+      return "speaking";
+    case "connecting":
+    case "thinking":
+    default:
+      return "thinking";
+  }
 }
 
 interface AgentSidePanelProps {
@@ -138,13 +129,9 @@ function AgentSidePanelChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const invalidateDashboards = useInvalidateDashboards();
   const refreshedDashboardTools = useRef(new Set<string>());
-  const lastSpokenMessageId = useRef<string | null>(null);
-  const [awaitingVoiceReply, setAwaitingVoiceReply] = useState(false);
-  const [voiceSessionActive, setVoiceSessionActive] = useState(false);
-  const [voiceGreeting, setVoiceGreeting] = useState(false);
-  const voiceSessionRef = useRef(false);
-  const hasVoiceGreetedRef = useRef(false);
-  const isStreamingRef = useRef(false);
+  const voiceRefreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
 
   const transport = useMemo(
     () =>
@@ -162,25 +149,65 @@ function AgentSidePanelChat({
     });
 
   const isStreaming = status === "streaming" || status === "submitted";
-  isStreamingRef.current = isStreaming;
 
   const sendText = useCallback(
-    (text: string, options?: { fromVoice?: boolean }) => {
+    (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || isStreaming) return;
-      if (options?.fromVoice) setAwaitingVoiceReply(true);
       void sendMessage({ text: trimmed });
     },
     [isStreaming, sendMessage]
   );
 
-  const { speak, stop: stopSpeech, speaking, playbackStream } = useAgentSpeech({
-    voiceId: agent.voice.voice_id,
-    speed: agent.voice.speed,
-    provider: agent.voice.provider,
+  const refreshHistoryFromVoice = useCallback(async () => {
+    const result = await refetch();
+    if (result.data?.messages) {
+      setMessages(result.data.messages);
+    }
+    if (result.data?.conversationId) {
+      setConversationOverride(result.data.conversationId);
+    }
+  }, [refetch, setMessages]);
+
+  const handleVoiceTranscription = useCallback(
+    (text: string, isFinal: boolean, role: "user" | "assistant") => {
+      if (!isFinal || !text.trim() || role !== "assistant") return;
+      clearTimeout(voiceRefreshTimer.current);
+      voiceRefreshTimer.current = setTimeout(() => {
+        void refreshHistoryFromVoice();
+      }, 500);
+    },
+    [refreshHistoryFromVoice]
+  );
+
+  const {
+    beginVoiceSession,
+    disconnect,
+    canUseVoice,
+    state: voiceState,
+    error: voiceSessionError,
+    isConnected: voiceConnected,
+    micStream,
+  } = useElevenLabsVoiceSession({
+    agentId: agent.id,
+    conversationId,
+    voiceAllowed: agent.voiceAllowed,
+    voiceEnabledOnAgent: agent.voice.enabled,
+    onTranscription: handleVoiceTranscription,
+    onConversationId: (id) => setConversationOverride(id),
   });
 
+  const voiceSessionActive =
+    voiceConnected ||
+    voiceState === "connecting" ||
+    voiceState === "greeting" ||
+    voiceState === "listening" ||
+    voiceState === "user-speaking" ||
+    voiceState === "thinking" ||
+    voiceState === "speaking";
+
   const [draft, setDraft] = useState("");
+  const [voiceOverlayOpen, setVoiceOverlayOpen] = useState(false);
 
   const sendDraft = () => {
     const text = draft.trim();
@@ -189,105 +216,35 @@ function AgentSidePanelChat({
     sendText(text);
   };
 
-  const onVoiceTranscriptRef = useRef<(text: string) => void>(() => {});
-  const onVoiceEmptyRef = useRef<() => void>(() => {});
-
-  const {
-    supported: voiceSupported,
-    listening,
-    transcribing,
-    micStream,
-    interimTranscript,
-    error: voiceError,
-    startListening,
-    cancelListening,
-  } = usePushToTalk({
-    disabled: isStreaming,
-    onFinalTranscript: (text) => onVoiceTranscriptRef.current(text),
-    onEmptyTranscript: () => onVoiceEmptyRef.current(),
-  });
-
-  const resumeVoiceListening = useCallback(() => {
-    if (!voiceSessionRef.current || isStreamingRef.current) return;
-    void startListening();
-  }, [startListening]);
-
-  const cancelVoiceSession = useCallback(() => {
-    voiceSessionRef.current = false;
-    setVoiceSessionActive(false);
-    setVoiceGreeting(false);
-    hasVoiceGreetedRef.current = false;
-    setAwaitingVoiceReply(false);
-    stopSpeech();
-    cancelListening();
-  }, [cancelListening, stopSpeech]);
-
-  onVoiceTranscriptRef.current = (text) => {
-    if (isVoiceFarewell(text)) {
-      cancelVoiceSession();
-      return;
-    }
-    sendText(text, { fromVoice: true });
-  };
-  onVoiceEmptyRef.current = () => {
-    if (voiceSessionRef.current) resumeVoiceListening();
-  };
-
-  const startVoiceSession = async () => {
-    if (isStreaming || voiceSessionRef.current || listening || transcribing) return;
-
-    voiceSessionRef.current = true;
-    setVoiceSessionActive(true);
-    stopSpeech();
-
-    if (!hasVoiceGreetedRef.current) {
-      hasVoiceGreetedRef.current = true;
-      setVoiceGreeting(true);
-      await speak(`I'm ${agent.name}. Go ahead, I'm listening.`);
-      setVoiceGreeting(false);
-    }
-
-    if (!voiceSessionRef.current) return;
-    await startListening();
-  };
+  const endVoiceSession = useCallback(() => {
+    setVoiceOverlayOpen(false);
+    writeVoiceModePreference(false);
+    void disconnect();
+  }, [disconnect]);
 
   const handleMicPress = () => {
-    if (
-      voiceSessionActive ||
-      listening ||
-      transcribing ||
-      speaking ||
-      voiceGreeting
-    ) {
-      cancelVoiceSession();
+    if (voiceSessionActive || voiceOverlayOpen) {
+      endVoiceSession();
       return;
     }
-    void startVoiceSession();
+    if (!canUseVoice || isStreaming) return;
+    setVoiceOverlayOpen(true);
+    void beginVoiceSession();
   };
 
-  const voiceOverlayOpen =
-    voiceSessionActive ||
-    listening ||
-    transcribing ||
-    awaitingVoiceReply ||
-    speaking;
-
-  const voicePhase: VoiceOverlayPhase = voiceGreeting
-    ? "greeting"
-    : listening
-      ? "listening"
-      : transcribing
-        ? "transcribing"
-        : speaking
-          ? "speaking"
-          : "thinking";
+  const voicePhase = mapVoiceSessionPhase(voiceState);
 
   useEffect(() => {
-    if (error && awaitingVoiceReply) {
-      setAwaitingVoiceReply(false);
-      resumeVoiceListening();
+    if (voiceState === "idle" || voiceState === "error") {
+      setVoiceOverlayOpen(false);
     }
-  }, [error, awaitingVoiceReply, resumeVoiceListening]);
+  }, [voiceState]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(voiceRefreshTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     for (const msg of messages) {
@@ -305,31 +262,9 @@ function AgentSidePanelChat({
   }, [messages, invalidateDashboards]);
 
   useEffect(() => {
-    if (!awaitingVoiceReply || isStreaming) return;
-
-    const last = messages[messages.length - 1];
-    if (!last || last.role !== "assistant") return;
-    if (lastSpokenMessageId.current === last.id) return;
-
-    const text = messageText(last);
-    if (!text.trim()) {
-      setAwaitingVoiceReply(false);
-      resumeVoiceListening();
-      return;
-    }
-
-    lastSpokenMessageId.current = last.id;
-    setAwaitingVoiceReply(false);
-    void (async () => {
-      await speak(text);
-      resumeVoiceListening();
-    })();
-  }, [awaitingVoiceReply, isStreaming, messages, speak, resumeVoiceListening]);
-
-  useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, status, interimTranscript]);
+  }, [messages, status]);
 
   const startNewChat = async () => {
     if (startingNewChat || isStreaming) return;
@@ -355,14 +290,9 @@ function AgentSidePanelChat({
   const lastUserText = [...messages].reverse().find((m) => m.role === "user");
   const lastUserMessage = lastUserText ? messageText(lastUserText) : "";
 
-  const errorMessage =
-    error?.message?.includes("429") || error?.message?.includes("limit")
-      ? "You've reached your daily message limit. Try again tomorrow."
-      : error?.message;
-
   const grad = agentGradient(agent.color);
   const glow = `${agent.color}88`;
-  const canUseLiveVoice = agent.voiceAllowed && agent.voice.enabled;
+  const canUseLiveVoice = canUseVoice;
 
   return (
     <>
@@ -372,8 +302,8 @@ function AgentSidePanelChat({
         agentName={agent.name}
         agentColor={agent.color}
         micStream={micStream}
-        playbackStream={playbackStream}
         continuousSession={voiceSessionActive}
+        onEndCall={endVoiceSession}
       />
       <PanelShell
       agent={agent}
@@ -474,12 +404,6 @@ function AgentSidePanelChat({
             );
           })}
 
-        {listening && interimTranscript && (
-          <div className="aria-slide-up max-w-[85%] self-end rounded-[16px_16px_4px_16px] border border-aria-primary/30 bg-aria-primary/15 px-3 py-2 text-sm text-aria-primary-light">
-            {interimTranscript}
-          </div>
-        )}
-
         {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex items-center gap-2 self-start">
             <AgentOrb color={agent.color} size={28} />
@@ -492,26 +416,17 @@ function AgentSidePanelChat({
         )}
 
         {error && (
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-center text-xs text-aria-danger">{errorMessage}</p>
-            {lastUserMessage && (
-              <button
-                type="button"
-                onClick={() => void regenerate()}
-                className="inline-flex items-center gap-1.5 rounded-full border border-aria-border px-3 py-1 text-xs text-aria-text-secondary hover:text-aria-text"
-              >
-                <RotateCcw className="size-3" />
-                Retry
-              </button>
-            )}
-          </div>
+          <ChatErrorNotice
+            error={error}
+            onRetry={lastUserMessage ? () => void regenerate() : undefined}
+          />
         )}
       </div>
 
       <div className="shrink-0 border-t border-aria-border-subtle px-4 py-3">
-        {voiceError && (
+        {voiceSessionError && (
           <p className="mb-2 text-center text-[11px] text-aria-danger">
-            {voiceError}
+            {voiceSessionError}
           </p>
         )}
         <div className="flex items-center gap-2 rounded-full border border-aria-border bg-[#16161f] py-1.5 pr-1.5 pl-2 transition-all focus-within:border-aria-primary focus-within:shadow-[0_0_0_3px_rgba(124,58,237,0.14)]">
@@ -541,37 +456,23 @@ function AgentSidePanelChat({
               <button
                 type="button"
                 aria-label={
-                  voiceSessionActive ||
-                  listening ||
-                  transcribing ||
-                  speaking ||
-                  voiceGreeting
-                    ? "Stop voice session"
-                    : "Start voice message"
+                  voiceSessionActive ? "Stop voice session" : "Start voice session"
                 }
-                disabled={!voiceSupported}
+                disabled={!canUseLiveVoice}
                 onClick={handleMicPress}
                 className={cn(
                   "flex size-9 shrink-0 items-center justify-center rounded-full transition-colors select-none",
-                  listening ||
-                    transcribing ||
-                    speaking ||
-                    voiceGreeting ||
-                    voiceSessionActive
+                  voiceSessionActive
                     ? "bg-aria-danger/20 text-aria-danger ring-2 ring-aria-danger/40"
                     : "text-aria-text-secondary hover:bg-aria-subtle hover:text-aria-primary-light",
-                  !voiceSupported && "cursor-not-allowed opacity-40"
+                  !canUseLiveVoice && "cursor-not-allowed opacity-40"
                 )}
                 title={
-                  !voiceSupported
-                    ? "Voice not supported in this browser"
-                    : voiceSessionActive ||
-                        listening ||
-                        transcribing ||
-                        speaking ||
-                        voiceGreeting
+                  !canUseLiveVoice
+                    ? "Voice is not available for this agent"
+                    : voiceSessionActive
                       ? "Tap to end voice session"
-                      : "Tap to speak"
+                      : "Tap to start live voice"
                 }
               >
                 <Mic className="size-4" />
@@ -593,17 +494,11 @@ function AgentSidePanelChat({
             </>
           )}
         </div>
-        {voiceSupported && (
+        {canUseLiveVoice && (
           <p className="mt-2 text-center text-[10px] text-aria-text-muted">
-            {voiceSessionActive ||
-            listening ||
-            transcribing ||
-            speaking ||
-            voiceGreeting
+            {voiceSessionActive
               ? "Tap the mic to end voice session"
-              : canUseLiveVoice
-                ? "Mic: quick voice message · Phone icon above: live conversation"
-                : "Tap the mic to speak"}
+              : "Tap the mic for live voice with your agent"}
           </p>
         )}
       </div>

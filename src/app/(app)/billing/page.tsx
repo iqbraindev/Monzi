@@ -3,7 +3,7 @@ import { Check, CreditCard, Download } from "lucide-react";
 const PLAN_FEATURES = [
   "Up to 10 agents",
   "2,000 messages / month",
-  "250+ integrations via Composio",
+  "250+ app integrations",
   "5 team seats",
   "Priority support",
 ];

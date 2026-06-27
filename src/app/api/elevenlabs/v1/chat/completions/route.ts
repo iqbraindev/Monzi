@@ -15,20 +15,28 @@ import {
 } from "@/lib/voice/openai-sse";
 import {
   latestUserText,
-  openAIMessagesToUi,
+  findStoredAssistantReply,
   uiMessageText,
   type OpenAIChatMessage,
 } from "@/lib/voice/openai-messages";
 import {
   cacheVoiceContext,
   getActiveVoiceSession,
-  getCachedVoiceContext,
+  getInFlightVoiceTurnResult,
+  markVoiceIntroSpoken,
+  registerInFlightVoiceTurnResult,
+  releaseVoiceTurn,
+  tryAcquireVoiceTurn,
+  voiceTurnKey,
 } from "@/lib/voice/session-cache";
 import {
   verifyVoiceSessionToken,
   type VoiceSessionPayload,
 } from "@/lib/voice/session-token";
-import { generateVoiceAcknowledgment } from "@/lib/voice/voice-acknowledgment";
+import {
+  sanitizeForSpeech,
+  StreamingSpeechSanitizer,
+} from "@/lib/voice/sanitize-speech";
 
 export const maxDuration = 120;
 
@@ -90,6 +98,10 @@ function isClientAbort(err: unknown): boolean {
 }
 
 function streamSpokenResponse(text: string, model = "monzi"): Response {
+  return streamSpokenResponseRaw(sanitizeForSpeech(text), model);
+}
+
+function streamSpokenResponseRaw(text: string, model = "monzi"): Response {
   const chunkId = `chatcmpl-${randomUUID()}`;
   const { readable, writable } = new TransformStream<Uint8Array>();
   const writer = writable.getWriter();
@@ -156,6 +168,7 @@ export async function POST(req: Request) {
     JSON.stringify({
       hasSession: Boolean(session),
       hasUserMessage: Boolean(latestUser),
+      latestUserPreview: latestUser.slice(0, 80) || null,
       messageCount: incoming.length,
       stream: wantsStream,
       userId: body.user_id ?? null,
@@ -163,18 +176,40 @@ export async function POST(req: Request) {
   );
 
   if (!session) {
-    return streamSpokenResponse("Hi! How can I help you today?");
+    return streamSpokenResponseRaw(" ");
   }
 
   if (incoming.length === 0 || !latestUser) {
-    const agent = await loadAgentForUser(session.userId, session.agentId);
-    return streamSpokenResponse(
-      agent ? `Hi, I'm ${agent.name}. How can I help?` : "Hi! How can I help you today?"
-    );
+    if (markVoiceIntroSpoken(session.conversationId)) {
+      const agent = await loadAgentForUser(session.userId, session.agentId);
+      if (agent) {
+        return streamSpokenResponse(
+          `Hi, I'm ${agent.name}. How can I help you today?`
+        );
+      }
+    }
+    return streamSpokenResponseRaw(" ");
   }
 
+  const turnKey = voiceTurnKey(session.conversationId, latestUser);
+
+  const inFlight = getInFlightVoiceTurnResult(turnKey);
+  if (inFlight) {
+    const text = sanitizeForSpeech(await inFlight);
+    return text ? streamSpokenResponse(text) : streamSpokenResponseRaw(" ");
+  }
+
+  if (!tryAcquireVoiceTurn(turnKey)) {
+    return streamSpokenResponseRaw(" ");
+  }
+
+  let resolveTurn!: (text: string) => void;
+  const turnDone = new Promise<string>((resolve) => {
+    resolveTurn = resolve;
+  });
+  registerInFlightVoiceTurnResult(turnKey, turnDone);
+
   const chunkId = `chatcmpl-${randomUUID()}`;
-  const uiMessages = openAIMessagesToUi(incoming);
   const { readable, writable } = new TransformStream<Uint8Array>();
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
@@ -182,8 +217,13 @@ export async function POST(req: Request) {
 
   let streamedChars = 0;
   let closed = false;
+  let fullResponse = "";
 
   const isAborted = () => closed || abortSignal.aborted;
+
+  const completeTurn = (text: string) => {
+    resolveTurn(sanitizeForSpeech(text) || " ");
+  };
 
   const closeWriter = async () => {
     if (closed) return;
@@ -201,7 +241,10 @@ export async function POST(req: Request) {
     finish?: boolean;
   }) => {
     if (isAborted()) return false;
-    if (options.content) streamedChars += options.content.length;
+    if (options.content) {
+      streamedChars += options.content.length;
+      fullResponse += options.content;
+    }
     try {
       await writer.write(
         encoder.encode(formatOpenAIChunk({ id: chunkId, model, ...options }))
@@ -256,40 +299,28 @@ export async function POST(req: Request) {
         });
       }, KEEPALIVE_MS);
 
-      let ctx =
-        getCachedVoiceContext(session.conversationId) ??
-        (await prepareAgentTurn({
-          userId: session.userId,
-          agentId: session.agentId,
-          conversationId: session.conversationId,
-        }));
+      const ctx = await prepareAgentTurn({
+        userId: session.userId,
+        agentId: session.agentId,
+        conversationId: session.conversationId,
+      });
 
-      if (isAborted()) return;
-
-      if (!ctx || ctx.conversationId !== session.conversationId) {
-        stopKeepalive();
-        await enqueue({
-          role: "assistant",
-          content: "Sorry, I couldn't load this conversation.",
-        });
-        await finish();
+      if (isAborted()) {
+        completeTurn(fullResponse);
         return;
       }
 
-      if (!getCachedVoiceContext(session.conversationId)) {
-        ctx = {
-          ...ctx,
-          system: appendVoiceConversationGuidance(ctx.system),
-        };
-        cacheVoiceContext(session.conversationId, ctx);
+      if (!ctx || ctx.conversationId !== session.conversationId) {
+        stopKeepalive();
+        const msg = "Sorry, I couldn't load this conversation.";
+        await enqueue({ role: "assistant", content: msg });
+        await finish();
+        completeTurn(msg);
+        return;
       }
 
-      const acknowledgment = await generateVoiceAcknowledgment({
-        agentName: ctx.agent.name,
-        userMessage: latestUser,
-      });
-      if (isAborted()) return;
-      await enqueue({ role: "assistant", content: acknowledgment });
+      ctx.system = appendVoiceConversationGuidance(ctx.system);
+      cacheVoiceContext(session.conversationId, ctx);
 
       const stored = await loadConversationUiMessages(ctx.conversationId);
       const lastStoredUser = [...stored].reverse().find((m) => m.role === "user");
@@ -298,22 +329,46 @@ export async function POST(req: Request) {
         await persistUserMessage(ctx, latestUser);
       }
 
-      if (isAborted()) return;
+      const uiMessages = await loadConversationUiMessages(ctx.conversationId);
+
+      const cachedReply = findStoredAssistantReply(uiMessages, latestUser);
+      if (cachedReply) {
+        stopKeepalive();
+        const spoken = sanitizeForSpeech(cachedReply);
+        await enqueue({ role: "assistant", content: spoken });
+        await finish();
+        completeTurn(spoken);
+        return;
+      }
+
+      if (isAborted()) {
+        completeTurn(fullResponse);
+        return;
+      }
 
       const result = await streamAgentTurn(ctx, uiMessages);
       let sentModelText = false;
+      const speechSanitizer = new StreamingSpeechSanitizer();
 
       for await (const part of result.fullStream) {
         if (isAborted()) break;
         if (part.type === "text-delta" && part.text) {
-          const ok = await enqueue({ content: part.text });
+          const spoken = speechSanitizer.push(part.text);
+          if (!spoken) continue;
+          const ok = await enqueue({ content: spoken });
           if (!ok) break;
           sentModelText = true;
         }
       }
 
+      const trailing = speechSanitizer.flush();
+      if (!isAborted() && trailing) {
+        const ok = await enqueue({ content: trailing });
+        if (ok) sentModelText = true;
+      }
+
       if (!isAborted() && !sentModelText) {
-        const finalText = (await result.text).trim();
+        const finalText = sanitizeForSpeech((await result.text).trim());
         if (finalText) {
           await enqueue({ content: finalText });
           sentModelText = true;
@@ -330,24 +385,27 @@ export async function POST(req: Request) {
       } else {
         await closeWriter();
       }
+      completeTurn(fullResponse.trim() || VOICE_EMPTY_FALLBACK);
     } catch (err) {
       stopKeepalive();
       if (isClientAbort(err) || isAborted()) {
         await closeWriter();
+        completeTurn(fullResponse);
         return;
       }
       console.error("[elevenlabs/v1/chat/completions]", err);
       if (streamedChars === 0) {
-        await enqueue({
-          role: "assistant",
-          content: "Sorry, something went wrong while I was working on that.",
-        });
+        const msg = "Sorry, something went wrong while I was working on that.";
+        await enqueue({ role: "assistant", content: sanitizeForSpeech(msg) });
+        completeTurn(msg);
       } else {
-        await enqueue({
-          content: " Sorry, I hit an error finishing that request.",
-        });
+        const suffix = " Sorry, I hit an error finishing that request.";
+        await enqueue({ content: sanitizeForSpeech(suffix) });
+        completeTurn(fullResponse + suffix);
       }
       await finish();
+    } finally {
+      releaseVoiceTurn(turnKey);
     }
   })().catch(async (err) => {
     if (!isClientAbort(err)) {

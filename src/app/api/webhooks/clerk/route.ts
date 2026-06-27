@@ -89,12 +89,6 @@ export async function POST(req: Request) {
         is_default: true,
       });
 
-      await supabase.from("dashboards").insert({
-        user_id: id,
-        name: "My Dashboard",
-        is_default: true,
-      });
-
       break;
     }
 

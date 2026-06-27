@@ -2,24 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { sanitizeForSpeech } from "@/lib/voice/sanitize-speech";
+
 export interface UseAgentSpeechOptions {
   voiceId?: string;
   speed?: number;
   provider?: "openai" | "elevenlabs" | "none";
-}
-
-function sanitizeForSpeech(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, "code block omitted")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/#{1,6}\s/g, "")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\*(.+?)\*/g, "$1")
-    .replace(/^[-*]\s/gm, "")
-    .replace(/\[(.+?)\]\(.+?\)/g, "$1")
-    .replace(/\n{2,}/g, ". ")
-    .replace(/\n/g, " ")
-    .trim();
 }
 
 function speakWithBrowser(text: string): Promise<void> {

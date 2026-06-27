@@ -9,10 +9,25 @@ type ToolPart = {
   state?: string;
   title?: string;
   errorText?: string;
+  input?: Record<string, unknown>;
 };
 
 function toolLabel(part: ToolPart): string {
   if (part.title) return part.title;
+
+  const input = part.input;
+  if (part.type.includes("create_dashboard_widget") && input) {
+    const widgetTitle = typeof input.title === "string" ? input.title : "widget";
+    const dashName =
+      typeof input.dashboard_name === "string" ? input.dashboard_name : null;
+    if (dashName) return `add ${widgetTitle} to ${dashName}`;
+    return `add ${widgetTitle}`;
+  }
+
+  if (part.type.includes("create_dashboard") && input?.name) {
+    return `create dashboard "${String(input.name)}"`;
+  }
+
   const name = part.type.replace(/^tool-/, "").replace(/_/g, " ");
   return name || "tool";
 }
@@ -58,10 +73,16 @@ export function ToolCallCard({ part }: { part: ToolPart }) {
 export function isDashboardTool(type: string): boolean {
   return (
     type.includes("create_dashboard") ||
-    type.includes("create_dashboard_widget")
+    type.includes("create_dashboard_widget") ||
+    type.includes("list_dashboards")
   );
 }
 
-export function isComposioTool(type: string): boolean {
+export function isIntegrationTool(type: string): boolean {
   return type.startsWith("tool-") && !isDashboardTool(type);
+}
+
+/** @deprecated use isIntegrationTool */
+export function isComposioTool(type: string): boolean {
+  return isIntegrationTool(type);
 }

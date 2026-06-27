@@ -1,6 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { synthesizeSpeech } from "@/lib/ai/speak-audio";
+import {
+  clampElevenLabsSpeed,
+  sanitizeForSpeech,
+} from "@/lib/voice/sanitize-speech";
 
 export const maxDuration = 30;
 
@@ -31,18 +35,21 @@ export async function POST(req: Request) {
       return Response.json({ error: "text is required" }, { status: 400 });
     }
 
-    const clippedText = text.slice(0, 4000);
-    const provider = body.provider ?? "openai";
-    const voiceId = "nova";
-    const speed = body.speed ?? 1;
+    const clippedText = sanitizeForSpeech(text).slice(0, 4000);
+    if (!clippedText) {
+      return Response.json({ error: "text is empty after sanitization" }, { status: 400 });
+    }
+    const provider = body.provider ?? "elevenlabs";
+    const voiceId =
+      body.voice_id?.trim() ||
+      body.voice?.trim() ||
+      process.env.ELEVENLABS_DEFAULT_VOICE_ID ||
+      "EXAVITQu4vr4xnSDxMaL";
+    const speed = clampElevenLabsSpeed(body.speed ?? 1);
 
     if (provider === "elevenlabs" && isElevenLabsConfigured()) {
-      const elevenVoiceId =
-        voiceId ??
-        process.env.ELEVENLABS_DEFAULT_VOICE_ID ??
-        "JBFqnCBsd6RMkjVDRZzb";
       const res = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${elevenVoiceId}/stream`,
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
         {
           method: "POST",
           headers: {
@@ -52,7 +59,11 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             text: clippedText,
             model_id: "eleven_turbo_v2",
-            voice_settings: { stability: 0.4, similarity_boost: 0.8 },
+            voice_settings: {
+              stability: 0.4,
+              similarity_boost: 0.8,
+              speed,
+            },
           }),
         }
       );

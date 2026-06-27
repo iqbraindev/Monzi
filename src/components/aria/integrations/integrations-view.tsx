@@ -63,9 +63,9 @@ export function IntegrationsView() {
       setStep("success");
       invalidate();
 
-      const stored = sessionStorage.getItem("composio-connect-agents");
+      const stored = sessionStorage.getItem("monzi-connect-agents");
       const agentIds = stored ? (JSON.parse(stored) as string[]) : undefined;
-      sessionStorage.removeItem("composio-connect-agents");
+      sessionStorage.removeItem("monzi-connect-agents");
 
       void fetch("/api/composio/sync-agents", {
         method: "POST",
@@ -135,7 +135,7 @@ export function IntegrationsView() {
 
       if (body.redirectUrl) {
         sessionStorage.setItem(
-          "composio-connect-agents",
+          "monzi-connect-agents",
           JSON.stringify(agentIds)
         );
         window.location.href = body.redirectUrl as string;
@@ -258,7 +258,7 @@ export function IntegrationsView() {
           Browse all integrations
         </h2>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-aria-primary/30 bg-aria-primary/15 px-3 py-0.5 text-xs font-semibold text-aria-primary-light">
-          ✨ 250+ via Composio
+          ✨ 250+ apps available
         </span>
       </div>
 
@@ -345,7 +345,7 @@ export function IntegrationsView() {
                   Connect {modalApp.name}
                 </div>
                 <div className="text-xs text-aria-text-secondary">
-                  to Monzi via Composio
+                  secure connection to Monzi
                 </div>
               </div>
               <button

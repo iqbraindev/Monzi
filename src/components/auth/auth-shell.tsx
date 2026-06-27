@@ -21,7 +21,7 @@ export function AuthShell({ title, children, panel }: AuthShellProps) {
             {title}
           </h1>
 
-          <div className="auth-clerk">{children}</div>
+          <div className="auth-form">{children}</div>
 
           <p className="mt-6 text-center text-sm text-[#9ca3af] lg:hidden">
             {panel.description}{" "}

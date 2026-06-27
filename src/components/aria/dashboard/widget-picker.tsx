@@ -6,17 +6,9 @@ import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useActiveDashboard, useDashboardStore } from "@/lib/store/dashboard-store";
 import { WIDGET_CATEGORIES, WIDGET_OPTIONS } from "@/lib/aria/mock-data";
+import { WIDGET_TOOLKIT } from "@/lib/dashboard/widget-registry";
 import { useConnectedToolkits } from "@/hooks/use-composio-connections";
 import { useInvalidateDashboards } from "@/hooks/use-dashboards";
-
-const WIDGET_TOOLKIT: Record<string, string> = {
-  email: "gmail",
-  tasks: "notion",
-  calendar: "googlecalendar",
-  revenue: "stripe",
-  pipeline: "hubspot",
-  slack: "slack",
-};
 
 export function WidgetPicker() {
   const open = useDashboardStore((s) => s.pickerOpen);
@@ -30,7 +22,7 @@ export function WidgetPicker() {
   const options = useMemo(
     () =>
       WIDGET_OPTIONS.map((w) => {
-        const toolkit = WIDGET_TOOLKIT[w.id];
+        const toolkit = WIDGET_TOOLKIT[w.id as keyof typeof WIDGET_TOOLKIT];
         if (!toolkit) return w;
         return { ...w, connected: toolkits.has(toolkit) };
       }),

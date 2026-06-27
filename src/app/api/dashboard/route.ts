@@ -1,9 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 
-import {
-  listDashboards,
-  seedDefaultDashboardIfEmpty,
-} from "@/lib/dashboard/service";
+import { createDashboard, listDashboards } from "@/lib/dashboard/service";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
 
@@ -17,7 +14,6 @@ export async function GET() {
     await ensureSupabaseUser(userId);
 
     const supabase = getSupabaseAdmin();
-    await seedDefaultDashboardIfEmpty(supabase, userId);
     const dashboards = await listDashboards(supabase, userId);
 
     return Response.json({ dashboards });
@@ -25,6 +21,44 @@ export async function GET() {
     const message =
       err instanceof Error ? err.message : "Failed to load dashboards";
     console.error("[dashboard GET]", err);
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await ensureSupabaseUser(userId);
+
+    const body = (await req.json()) as {
+      name?: string;
+      icon?: string;
+      description?: string;
+    };
+
+    const name = body.name?.trim();
+    if (!name) {
+      return Response.json({ error: "name is required" }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+    const dashboard = await createDashboard(supabase, {
+      userId,
+      name,
+      icon: body.icon,
+      description: body.description,
+      createdBy: "user",
+    });
+
+    return Response.json({ dashboard });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Failed to create dashboard";
+    console.error("[dashboard POST]", err);
     return Response.json({ error: message }, { status: 500 });
   }
 }

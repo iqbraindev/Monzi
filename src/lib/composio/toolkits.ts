@@ -1,6 +1,6 @@
 import type { Integration } from "@/lib/aria/types";
 
-/** Composio toolkit slug for each integration display name. */
+/** Internal toolkit slug map for integration display names. */
 export const INTEGRATION_TOOLKIT_MAP: Record<string, string> = {
   Gmail: "gmail",
   "Google Calendar": "googlecalendar",
@@ -18,6 +18,7 @@ export const INTEGRATION_TOOLKIT_MAP: Record<string, string> = {
   Dropbox: "dropbox",
   Mailchimp: "mailchimp",
   Zoom: "zoom",
+  HighLevel: "highlevel",
 };
 
 /** Visual metadata keyed by toolkit slug. */
@@ -168,6 +169,15 @@ export const TOOLKIT_CATALOG: Record<
     category: "Communication",
     desc: "Schedule calls and pull meeting recaps.",
     popular: false,
+  },
+  highlevel: {
+    name: "HighLevel",
+    glyph: "HL",
+    bg: "#FF6B35",
+    fg: "#fff",
+    category: "CRM",
+    desc: "Manage contacts, pipelines, calendars, and campaigns.",
+    popular: true,
   },
 };
 

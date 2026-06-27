@@ -66,11 +66,12 @@ export async function POST(req: Request) {
 
   try {
     const result = await executeTool(userId, tool, params);
+    const raw = unwrapComposioResult(result);
     const payload = {
       tool,
       widgetId: body.widgetId,
       raw: result,
-      data: normalizeWidgetData(body.widgetId, result),
+      data: normalizeWidgetData(body.widgetId, raw),
     };
 
     if (redis) {
@@ -83,6 +84,18 @@ export async function POST(req: Request) {
       err instanceof Error ? err.message : "Tool execution failed";
     return Response.json({ error: message }, { status: 500 });
   }
+}
+
+function unwrapComposioResult(result: unknown): unknown {
+  if (
+    result &&
+    typeof result === "object" &&
+    "data" in result &&
+    (result as { data?: unknown }).data !== undefined
+  ) {
+    return (result as { data: unknown }).data;
+  }
+  return result;
 }
 
 function hashParams(params: Record<string, unknown>): string {

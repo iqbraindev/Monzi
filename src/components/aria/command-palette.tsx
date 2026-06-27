@@ -104,7 +104,8 @@ export function CommandPalette() {
     {
       title: "Quick Create",
       items: [
-        { icon: "+", label: "Create new agent", run: go("/agents?create=1") },
+        { icon: "+", label: "Create new agent", run: go("/agents/new") },
+        { icon: "+", label: "Quick create agent", run: go("/agents/new?quick=1") },
         { icon: "+", label: "Add widget to dashboard", run: go("/dashboard") },
         { icon: "+", label: "Connect an app", run: go("/integrations") },
       ],

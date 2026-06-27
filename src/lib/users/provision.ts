@@ -113,19 +113,4 @@ async function provisionSupabaseUser(userId: string): Promise<void> {
       is_default: true,
     });
   }
-
-  const { data: existingDashboard } = await supabase
-    .from("dashboards")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("is_default", true)
-    .maybeSingle();
-
-  if (!existingDashboard) {
-    await supabase.from("dashboards").insert({
-      user_id: userId,
-      name: "My Dashboard",
-      is_default: true,
-    });
-  }
 }

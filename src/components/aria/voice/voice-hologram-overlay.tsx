@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { PhoneOff } from "lucide-react";
 
 import { useAudioAnalyser } from "@/hooks/use-audio-analyser";
 import { agentGradient } from "@/lib/aria/mock-data";
@@ -22,6 +23,7 @@ interface VoiceHologramOverlayProps {
   micStream?: MediaStream | null;
   playbackStream?: MediaStream | null;
   continuousSession?: boolean;
+  onEndCall?: () => void;
 }
 
 const PHASE_LABEL: Record<VoiceOverlayPhase, string> = {
@@ -181,6 +183,7 @@ export function VoiceHologramOverlay({
   micStream = null,
   playbackStream = null,
   continuousSession = false,
+  onEndCall,
 }: VoiceHologramOverlayProps) {
   const audioSource =
     phase === "listening"
@@ -257,6 +260,22 @@ export function VoiceHologramOverlay({
                   ? "Monzi is working on your reply — you'll hear back soon"
                   : "Hold tight while Monzi processes your request"}
         </p>
+
+        {onEndCall && (
+          <button
+            type="button"
+            onClick={onEndCall}
+            className={cn(
+              "mt-2 flex size-14 items-center justify-center rounded-full",
+              "bg-red-500/90 text-white shadow-lg shadow-red-500/30",
+              "transition-transform hover:scale-105 hover:bg-red-500 active:scale-95",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#030308]"
+            )}
+            aria-label="End call"
+          >
+            <PhoneOff className="size-6" strokeWidth={2.25} />
+          </button>
+        )}
       </div>
     </div>,
     document.body

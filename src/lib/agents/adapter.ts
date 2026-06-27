@@ -1,5 +1,7 @@
 import type { Agent, AgentVoice, AppGlyph } from "@/lib/aria/types";
+import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
 import { TOOLKIT_CATALOG } from "@/lib/composio/toolkits";
+import { normalizeAgentVoice } from "@/lib/voice/voice-options";
 
 export interface DbAgentVoice {
   provider?: "openai" | "elevenlabs" | "none";
@@ -16,13 +18,19 @@ export interface DbAgent {
   role: string;
   description: string | null;
   avatar: {
+    style?: string;
+    asset_id?: string;
     primary_color?: string;
+    background_color?: string;
+    custom_image_url?: string;
   };
   personality?: {
     preset?: string;
     tone?: string;
     language?: string;
     response_style?: string;
+    custom_instructions?: string;
+    llm_model?: string;
   };
   tools: {
     composio_apps?: string[];
@@ -62,13 +70,7 @@ function formatLastActive(updatedAt: string): string {
 }
 
 function normalizeVoice(voice?: DbAgentVoice): AgentVoice {
-  return {
-    provider: voice?.provider ?? "openai",
-    voice_id: voice?.voice_id ?? "nova",
-    speed: voice?.speed ?? 1.0,
-    // Enabled for all agents until per-agent voice settings ship (legacy DB default was false).
-    enabled: true,
-  };
+  return normalizeAgentVoice(voice);
 }
 
 export function dbAgentToUiAgent(
@@ -77,9 +79,11 @@ export function dbAgentToUiAgent(
   extraToolkits: string[] = [],
   voiceAllowed = true
 ): Agent {
-  const composioApps = [
-    ...new Set([...(agent.tools?.composio_apps ?? []), ...extraToolkits]),
-  ];
+  const agentApps = agent.tools?.composio_apps ?? [];
+  const composioApps =
+    extraToolkits.length > 0
+      ? filterComposioAppsForConnected(agentApps, extraToolkits)
+      : agentApps;
   const color = agent.avatar?.primary_color ?? "#7C3AED";
 
   return {
@@ -100,5 +104,6 @@ export function dbAgentToUiAgent(
       : ["Connect apps in Integrations to unlock capabilities"],
     voice: normalizeVoice(agent.voice),
     voiceAllowed,
+    isDefault: agent.is_default,
   };
 }

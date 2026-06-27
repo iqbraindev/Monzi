@@ -53,3 +53,47 @@ export function getActiveVoiceSession(
   }
   return entry.value;
 }
+
+/** Prevents duplicate parallel custom-LLM runs for the same user turn. */
+const activeTurnKeys = new Set<string>();
+
+export function voiceTurnKey(conversationId: string, userText: string): string {
+  return `${conversationId}:${userText.trim().toLowerCase()}`;
+}
+
+export function tryAcquireVoiceTurn(key: string): boolean {
+  if (activeTurnKeys.has(key)) return false;
+  activeTurnKeys.add(key);
+  return true;
+}
+
+export function releaseVoiceTurn(key: string): void {
+  activeTurnKeys.delete(key);
+}
+
+const introSpokenFor = new Set<string>();
+const inFlightTurnResults = new Map<string, Promise<string>>();
+
+export function markVoiceIntroSpoken(conversationId: string): boolean {
+  if (introSpokenFor.has(conversationId)) return false;
+  introSpokenFor.add(conversationId);
+  return true;
+}
+
+export function getInFlightVoiceTurnResult(
+  key: string
+): Promise<string> | undefined {
+  return inFlightTurnResults.get(key);
+}
+
+export function registerInFlightVoiceTurnResult(
+  key: string,
+  promise: Promise<string>
+): void {
+  inFlightTurnResults.set(key, promise);
+  void promise.finally(() => {
+    if (inFlightTurnResults.get(key) === promise) {
+      inFlightTurnResults.delete(key);
+    }
+  });
+}

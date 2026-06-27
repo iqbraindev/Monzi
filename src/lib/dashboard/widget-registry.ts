@@ -12,6 +12,15 @@ export interface WidgetRegistryEntry {
   defaultFilters?: Record<string, unknown>;
 }
 
+/** Toolkit slug required for each widget type (undefined = no connection needed). */
+export const WIDGET_TOOLKIT: Partial<Record<WidgetType, string>> = {
+  email: "gmail",
+  tasks: "notion",
+  calendar: "googlecalendar",
+  revenue: "stripe",
+  pipeline: "hubspot",
+};
+
 const SIZE_MAP = {
   small: { w: 3, h: 3 },
   medium: { w: 6, h: 4 },
@@ -74,12 +83,6 @@ export function defaultDataSource(type: WidgetType): WidgetDataSource {
   };
 }
 
-/** Default widgets to seed an empty dashboard (Morning Briefing layout). */
-export const DEFAULT_SEED_WIDGETS: { type: WidgetType; title: string; layout: WidgetLayout }[] = [
-  { type: "email", title: "Email Inbox", layout: { x: 0, y: 0, w: 6, h: 4 } },
-  { type: "tasks", title: "Tasks", layout: { x: 6, y: 0, w: 6, h: 4 } },
-  { type: "calendar", title: "Calendar", layout: { x: 0, y: 4, w: 4, h: 4 } },
-  { type: "revenue", title: "Revenue", layout: { x: 4, y: 4, w: 4, h: 4 } },
-  { type: "pipeline", title: "Pipeline", layout: { x: 8, y: 4, w: 4, h: 4 } },
-  { type: "insights", title: "AI Insights", layout: { x: 0, y: 8, w: 12, h: 3 } },
-];
+export function getRequiredToolkit(type: string): string | undefined {
+  return WIDGET_TOOLKIT[type as WidgetType];
+}

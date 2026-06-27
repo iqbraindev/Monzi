@@ -43,48 +43,111 @@ function formatRelativeTime(dateStr?: string): string {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function parseEmailDisplayName(value: string): string {
+  const trimmed = value.trim();
+  const named = trimmed.match(/^([^<]+)</);
+  if (named) {
+    return named[1].trim().replace(/^["']|["']$/g, "");
+  }
+  if (trimmed.includes("@")) {
+    const local = trimmed.split("@")[0]?.replace(/[._]/g, " ").trim();
+    if (local) return local;
+  }
+  return trimmed;
+}
+
+type GmailMessageRaw = {
+  id?: string;
+  messageId?: string;
+  from?: string;
+  sender?: string;
+  from_email?: string;
+  senderEmail?: string;
+  senderName?: string;
+  subject?: string;
+  date?: string;
+  time?: string;
+  internalDate?: string;
+  unread?: boolean;
+  snippet?: string;
+  labelIds?: string[];
+  headers?: Array<{ name?: string; value?: string }>;
+  payload?: { headers?: Array<{ name?: string; value?: string }> };
+};
+
+function extractSender(msg: GmailMessageRaw): string {
+  const candidates = [
+    msg.senderName,
+    msg.sender,
+    msg.from,
+    msg.from_email,
+    msg.senderEmail,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) {
+      return parseEmailDisplayName(c);
+    }
+  }
+
+  const headers =
+    msg.payload?.headers ??
+    msg.headers ??
+    [];
+  const fromHeader = headers.find((h) => h.name?.toLowerCase() === "from");
+  if (fromHeader?.value?.trim()) {
+    return parseEmailDisplayName(fromHeader.value);
+  }
+
+  return "Unknown";
+}
+
+function isUnread(msg: GmailMessageRaw): boolean {
+  if (typeof msg.unread === "boolean") return msg.unread;
+  if (Array.isArray(msg.labelIds)) {
+    return msg.labelIds.includes("UNREAD");
+  }
+  return false;
+}
+
 export function adaptGmailEmails(raw: unknown): EmailItem[] {
-  const data = raw as {
-    messages?: Array<{
-      id?: string;
-      from?: string;
-      subject?: string;
-      date?: string;
-      unread?: boolean;
-      snippet?: string;
-    }>;
-    data?: { messages?: EmailItem[] };
+  const root = raw as {
+    messages?: GmailMessageRaw[];
+    data?: { messages?: GmailMessageRaw[] };
   };
 
-  const messages = (data?.messages ?? (data?.data as { messages?: unknown[] })?.messages) as
-    | Array<{
-        id?: string;
-        from?: string;
-        subject?: string;
-        date?: string;
-        unread?: boolean;
-        snippet?: string;
-      }>
-    | undefined;
+  const messages = root?.messages ?? root?.data?.messages;
   if (!Array.isArray(messages)) return [];
 
   return messages.map((msg, i) => {
-    const name = msg.from ?? "Unknown";
+    const name = extractSender(msg);
+    const dateStr = msg.date ?? msg.time ?? msg.internalDate;
     return {
-      id: msg.id ?? String(i),
+      id: msg.messageId ?? msg.id ?? String(i),
       initials: initialsFromString(name),
       color: colorForIndex(i),
       name,
       subject: msg.subject ?? msg.snippet ?? "(no subject)",
-      time: formatRelativeTime(msg.date),
-      unread: Boolean(msg.unread),
+      time: formatRelativeTime(dateStr),
+      unread: isUnread(msg),
     };
   });
 }
 
 export function adaptNotionTasks(raw: unknown): TaskItem[] {
   const data = raw as {
-    results?: Array<{
+    results?: unknown[];
+    tasks?: TaskItem[];
+  };
+
+  const items = data?.results ?? data?.tasks;
+  if (!Array.isArray(items)) return [];
+
+  return items.map((item, i) => {
+    if (item && typeof item === "object" && "properties" in item) {
+      return notionPageToTask(item as NotionPageLike, i);
+    }
+
+    const row = item as {
       id?: string;
       title?: string;
       name?: string;
@@ -93,40 +156,77 @@ export function adaptNotionTasks(raw: unknown): TaskItem[] {
       priority?: string;
       completed?: boolean;
       done?: boolean;
-    }>;
-    tasks?: TaskItem[];
-  };
+    };
 
-  const items = (data?.results ?? data?.tasks) as
-    | Array<{
-        id?: string;
-        title?: string;
-        name?: string;
-        due?: string;
-        due_date?: string;
-        priority?: string;
-        completed?: boolean;
-        done?: boolean;
-      }>
-    | undefined;
-  if (!Array.isArray(items)) return [];
-
-  return items.map((item, i) => {
-    const dueRaw = item.due ?? item.due_date ?? "";
+    const dueRaw = row.due ?? row.due_date ?? "";
     const overdue =
       dueRaw &&
       new Date(dueRaw).getTime() < Date.now() &&
-      !(item.completed ?? item.done);
+      !(row.completed ?? row.done);
 
     return {
-      id: item.id ?? String(i),
-      name: item.title ?? item.name ?? "Untitled task",
+      id: row.id ?? String(i),
+      name: row.title ?? row.name ?? "Untitled task",
       due: dueRaw ? formatRelativeTime(dueRaw) || dueRaw : "No due date",
       overdue: Boolean(overdue),
-      priority: (item.priority as TaskItem["priority"]) ?? "medium",
-      done: Boolean(item.completed ?? item.done),
+      priority: (row.priority as TaskItem["priority"]) ?? "medium",
+      done: Boolean(row.completed ?? row.done),
     };
   });
+}
+
+type NotionPageLike = {
+  id?: string;
+  properties?: Record<
+    string,
+    {
+      type?: string;
+      title?: Array<{ plain_text?: string }>;
+      rich_text?: Array<{ plain_text?: string }>;
+      date?: { start?: string };
+      checkbox?: boolean;
+      select?: { name?: string };
+      status?: { name?: string };
+    }
+  >;
+};
+
+function notionPageToTask(page: NotionPageLike, index: number): TaskItem {
+  const props = page.properties ?? {};
+  let name = "Untitled task";
+  let dueRaw = "";
+  let done = false;
+  let priority: TaskItem["priority"] = "medium";
+
+  for (const prop of Object.values(props)) {
+    if (!prop?.type) continue;
+    if (prop.type === "title" && prop.title?.[0]?.plain_text) {
+      name = prop.title[0].plain_text;
+    } else if (prop.type === "date" && prop.date?.start) {
+      dueRaw = prop.date.start;
+    } else if (prop.type === "checkbox") {
+      done = Boolean(prop.checkbox);
+    } else if (prop.type === "select" && prop.select?.name) {
+      const value = prop.select.name.toLowerCase();
+      if (value.includes("high")) priority = "high";
+      else if (value.includes("low")) priority = "low";
+    } else if (prop.type === "status" && prop.status?.name) {
+      const value = prop.status.name.toLowerCase();
+      if (value.includes("done") || value.includes("complete")) done = true;
+    }
+  }
+
+  const overdue =
+    dueRaw && new Date(dueRaw).getTime() < Date.now() && !done;
+
+  return {
+    id: page.id ?? String(index),
+    name,
+    due: dueRaw ? formatRelativeTime(dueRaw) || dueRaw : "No due date",
+    overdue: Boolean(overdue),
+    priority,
+    done,
+  };
 }
 
 export function adaptCalendarEvents(raw: unknown): CalendarEvent[] {

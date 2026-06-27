@@ -44,6 +44,7 @@ export async function POST(
     }
 
     const widget = await createWidget(supabase, {
+      userId,
       dashboardId,
       type: body.type,
       title: body.title ?? reg.defaultTitle,
@@ -57,6 +58,7 @@ export async function POST(
     const message =
       err instanceof Error ? err.message : "Failed to add widget";
     console.error("[dashboard widgets POST]", err);
-    return Response.json({ error: message }, { status: 500 });
+    const status = message.includes("requires connecting") ? 400 : 500;
+    return Response.json({ error: message }, { status });
   }
 }

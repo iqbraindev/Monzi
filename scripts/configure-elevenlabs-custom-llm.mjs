@@ -142,7 +142,7 @@ async function main() {
             language: true,
             prompt: { prompt: true },
           },
-          tts: { voice_id: true },
+          tts: { voice_id: true, speed: true },
         },
         custom_llm_extra_body: true,
       },

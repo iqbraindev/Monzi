@@ -10,14 +10,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import type { DbAgent } from "@/lib/agents/adapter";
+import { getAgentLlmModel } from "@/lib/agents/llm-models";
 import { buildSystemPrompt } from "@/lib/agents/build-system-prompt";
-import { createOpenRouterProvider, openRouterModels } from "@/lib/ai/openrouter";
+import {
+  markOpenRouterCreditsExhausted,
+  resolveAgentChatModel,
+} from "@/lib/ai/openrouter";
 import { dbMessagesToUiMessages } from "@/lib/chat/message-mapper";
 import { getOrCreateConversation } from "@/lib/chat/conversation";
 import { getLangChainTools, listActiveConnections } from "@/lib/composio/tools";
 import { TOOLKIT_CATALOG } from "@/lib/composio/toolkits";
 import { getDashboardTools } from "@/lib/dashboard/tools";
-import { getDefaultDashboard } from "@/lib/dashboard/service";
+import { listDashboardSummaries } from "@/lib/dashboard/service";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export interface AgentTurnContext {
@@ -64,7 +68,7 @@ export async function prepareAgentTurn(params: {
   const connectedApps = connections
     .map((c) => c.toolkit?.slug)
     .filter((slug): slug is string => Boolean(slug));
-  const composioApps = [...new Set([...agentApps, ...connectedApps])];
+  const composioApps = agentApps.filter((slug) => connectedApps.includes(slug));
 
   const conversationId = await getOrCreateConversation(
     supabase,
@@ -87,7 +91,7 @@ export async function prepareAgentTurn(params: {
     ])
   );
 
-  const defaultDashboard = await getDefaultDashboard(supabase, params.userId);
+  const dashboardSummaries = await listDashboardSummaries(supabase, params.userId);
   const dashboardTools =
     agent.tools?.dashboard_control !== false
       ? getDashboardTools({
@@ -104,7 +108,7 @@ export async function prepareAgentTurn(params: {
   const system = buildSystemPrompt({
     agent,
     composioAppNames,
-    defaultDashboardId: defaultDashboard?.id,
+    dashboards: dashboardSummaries,
   });
 
   return {
@@ -190,12 +194,25 @@ export async function streamAgentTurn(
   ctx: AgentTurnContext,
   messages: UIMessage[]
 ) {
+  const llmModel = getAgentLlmModel(ctx.agent);
+  const model = await resolveAgentChatModel(llmModel);
   return streamText({
-    model: createOpenRouterProvider().chat(openRouterModels.primary),
+    model,
     system: ctx.system,
     messages: await convertToModelMessages(messages),
     tools: ctx.aiTools,
     stopWhen: stepCountIs(5),
+    onError: ({ error }) => {
+      if (
+        error &&
+        typeof error === "object" &&
+        "statusCode" in error &&
+        error.statusCode === 402
+      ) {
+        markOpenRouterCreditsExhausted();
+      }
+      console.error("[agent-turn]", error);
+    },
     onFinish: async ({ text, toolCalls, toolResults }) => {
       await persistAssistantMessage(
         ctx,
@@ -211,8 +228,10 @@ export async function executeAgentTurn(
   ctx: AgentTurnContext,
   messages: UIMessage[]
 ): Promise<AgentTurnResult> {
+  const llmModel = getAgentLlmModel(ctx.agent);
+  const model = await resolveAgentChatModel(llmModel);
   const result = await generateText({
-    model: createOpenRouterProvider().chat(openRouterModels.primary),
+    model,
     system: ctx.system,
     messages: await convertToModelMessages(messages),
     tools: ctx.aiTools,

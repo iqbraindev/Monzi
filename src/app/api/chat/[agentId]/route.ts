@@ -6,6 +6,7 @@ import {
   prepareAgentTurn,
   streamAgentTurn,
 } from "@/lib/agents/run-agent-turn";
+import { formatAiErrorMessage } from "@/lib/ai/user-facing-errors";
 import { getRedisOptional } from "@/lib/redis/optional";
 import { ensureSupabaseUser } from "@/lib/users/provision";
 
@@ -64,11 +65,14 @@ export async function POST(
     }
 
     const result = await streamAgentTurn(ctx, messages);
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      onError: formatAiErrorMessage,
+    });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Chat request failed";
     console.error("[chat]", err);
-    return Response.json({ error: message }, { status: 500 });
+    return Response.json(
+      { error: formatAiErrorMessage(err) },
+      { status: 500 }
+    );
   }
 }

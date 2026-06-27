@@ -26,6 +26,8 @@ export interface Agent {
   voice: AgentVoice;
   /** Whether the user's subscription allows voice mode. */
   voiceAllowed: boolean;
+  /** Primary agent created at signup — cannot be deleted. */
+  isDefault: boolean;
 }
 
 export interface DashboardTab {
@@ -106,7 +108,7 @@ export interface WidgetOption {
 
 export interface Integration {
   name: string;
-  /** Composio toolkit slug (e.g. gmail, notion). */
+  /** Integration toolkit slug (e.g. gmail, notion). */
   toolkitSlug?: string;
   glyph: string;
   /** Background color for the logo tile. */

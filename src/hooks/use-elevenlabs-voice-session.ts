@@ -48,7 +48,7 @@ interface VoiceSessionResponse {
       firstMessage: string;
       language: string;
     };
-    tts?: { voiceId: string };
+    tts?: { voiceId: string; speed?: number };
   };
 }
 
@@ -67,6 +67,7 @@ export function useElevenLabsVoiceSession({
   const [state, setState] = useState<VoiceSessionState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [micMuted, setMicMuted] = useState(false);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
 
   const conversationRef = useRef<ActiveConversation | null>(null);
   const connectingRef = useRef(false);
@@ -74,6 +75,7 @@ export function useElevenLabsVoiceSession({
   const greetingDoneRef = useRef(false);
   const agentSpeakingRef = useRef(false);
   const conversationIdRef = useRef<string | null>(conversationId);
+  const reportedTranscriptsRef = useRef(new Set<string>());
 
   const canUseVoice = voiceAllowed && voiceEnabledOnAgent;
   const voiceEnabled = useSyncExternalStore(
@@ -99,11 +101,22 @@ export function useElevenLabsVoiceSession({
 
     const conversation = conversationRef.current;
     conversationRef.current = null;
+
     if (conversation) {
+      try {
+        conversation.setVolume({ volume: 0 });
+      } catch {
+        // ignore — session may already be torn down
+      }
       await conversation.endSession().catch(() => undefined);
     }
+
+    setMicStream((stream) => {
+      stream?.getTracks().forEach((track) => track.stop());
+      return null;
+    });
+    reportedTranscriptsRef.current.clear();
     setState("idle");
-    intentionalDisconnectRef.current = false;
   }, []);
 
   const connect = useCallback(async () => {
@@ -137,7 +150,8 @@ export function useElevenLabsVoiceSession({
       }
 
       // Request mic access in the click handler stack so the browser grants it.
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMicStream(stream);
 
       const conversation = await Conversation.startSession({
         signedUrl: data.signedUrl,
@@ -157,6 +171,7 @@ export function useElevenLabsVoiceSession({
         onDisconnect: (details) => {
           conversationRef.current = null;
           if (intentionalDisconnectRef.current) {
+            intentionalDisconnectRef.current = false;
             setState("idle");
             return;
           }
@@ -200,13 +215,20 @@ export function useElevenLabsVoiceSession({
           message: string;
           source: "user" | "ai";
         }) => {
-          if (!message?.trim()) return;
+          const trimmed = message?.trim();
+          if (!trimmed) return;
+
+          const role = source === "user" ? "user" : "assistant";
+          const key = `${role}:${trimmed.toLowerCase()}`;
+          if (reportedTranscriptsRef.current.has(key)) return;
+          reportedTranscriptsRef.current.add(key);
+
           if (source === "user") {
-            onTranscription?.(message, true, "user");
+            onTranscription?.(trimmed, true, "user");
             if (!agentSpeakingRef.current) setState("thinking");
           } else {
             greetingDoneRef.current = true;
-            onTranscription?.(message, true, "assistant");
+            onTranscription?.(trimmed, true, "assistant");
           }
         },
       });
@@ -281,6 +303,7 @@ export function useElevenLabsVoiceSession({
     isUserSpeaking: state === "user-speaking",
     toggleMicrophone,
     isMicrophoneEnabled: isConnected && !micMuted,
+    micStream,
     disconnect,
   };
 }

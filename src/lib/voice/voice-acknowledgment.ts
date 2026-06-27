@@ -1,6 +1,8 @@
 import { generateText } from "ai";
 
-import { createOpenRouterProvider, openRouterModels } from "@/lib/ai/openrouter";
+import {
+  resolveFastChatModel,
+} from "@/lib/ai/openrouter";
 
 const FALLBACK_ACKS = [
   "Sure, working on that for you now.",
@@ -33,7 +35,7 @@ export async function generateVoiceAcknowledgment(params: {
 
   try {
     const result = await generateText({
-      model: createOpenRouterProvider().chat(openRouterModels.fast),
+      model: await resolveFastChatModel(),
       system:
         `You are ${agentName} on a live voice call. ` +
         `The user just asked something. Reply with exactly ONE short spoken sentence (8–14 words) ` +

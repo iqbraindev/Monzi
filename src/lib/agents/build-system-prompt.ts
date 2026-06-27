@@ -1,13 +1,14 @@
 import type { DbAgent } from "@/lib/agents/adapter";
+import type { DashboardSummary } from "@/lib/dashboard/service";
 
 export interface SystemPromptContext {
   agent: DbAgent;
   composioAppNames: string[];
-  defaultDashboardId?: string;
+  dashboards: DashboardSummary[];
 }
 
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
-  const { agent, composioAppNames, defaultDashboardId } = ctx;
+  const { agent, composioAppNames, dashboards } = ctx;
   const personality = agent.personality ?? {
     preset: "friendly",
     tone: "warm and helpful",
@@ -22,6 +23,14 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   }
 
   prompt += `\n\nPersonality: ${personality.preset}. Tone: ${personality.tone}. Response style: ${personality.response_style}.`;
+
+  const customInstructions = (
+    personality as { custom_instructions?: string }
+  ).custom_instructions?.trim();
+  if (customInstructions) {
+    prompt += `\n\nAdditional instructions:\n${customInstructions}`;
+  }
+
   prompt += `\nHelp the user with their work using connected apps when relevant. Be concise, warm, and actionable.`;
 
   if (composioAppNames.length) {
@@ -31,11 +40,24 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   }
 
   if (agent.tools?.dashboard_control !== false) {
-    prompt += `\n\nYou can control the user's dashboard. When they ask to show, display, or pull up information visually, use create_dashboard_widget. When they want a full custom view (meeting prep, client overview, etc.), use create_dashboard.`;
+    prompt += `\n\nYou can control the user's dashboards. When they ask to show, display, or pull up information visually, use create_dashboard_widget. When they want a new dashboard or a full custom view, use create_dashboard. Use list_dashboards to see current dashboards.`;
     prompt += `\nWidget types: email (inbox), tasks, calendar, revenue, pipeline, insights. For email lists use type "email" and pass filters like { "max_results": 3 } when the user asks for a specific count.`;
-    if (defaultDashboardId) {
-      prompt += `\nThe user's default dashboard ID is ${defaultDashboardId}.`;
+
+    if (dashboards.length > 0) {
+      const list = dashboards
+        .map((d) => `"${d.name}" (id: ${d.id}, ${d.widgetCount} widgets)`)
+        .join("; ");
+      prompt += `\n\nUser dashboards: ${list}.`;
+    } else {
+      prompt += `\n\nThe user has no dashboards yet.`;
     }
+
+    prompt += `\n\nDashboard rules:
+- Before adding a widget, you must know which dashboard to use.
+- If the user has not said which dashboard, ask: "Which dashboard should I add this to?" List their dashboards by name. Offer: "Or tell me a name and I'll create a new one."
+- If the user names a new dashboard, call create_dashboard (with or without widgets).
+- Never assume or pick a default dashboard silently.
+- Pass dashboard_name or dashboard_id to create_dashboard_widget — never omit both.`;
   }
 
   return prompt;
@@ -47,6 +69,9 @@ export function appendVoiceConversationGuidance(system: string): string {
     system +
     `\n\nYou are in a live voice call. Keep replies concise and easy to speak aloud. ` +
     `Do not use markdown, bullet points, code blocks, or emoji — use natural spoken sentences. ` +
-    `The user may already have heard a brief acknowledgment — do not repeat hold phrases like "one moment" or "let me check"; go straight to the answer or what you found.`
+    `Never invent or guess email senders, subjects, or message content — always call the connected email tools and only speak facts returned by those tools. ` +
+    `Never use placeholder names like John Doe or example.com addresses. ` +
+    `Do not say you are checking, looking, or pulling something up — call the tool silently and speak the result directly. ` +
+    `If a tool fails or no app is connected, say so plainly instead of making up data.`
   );
 }

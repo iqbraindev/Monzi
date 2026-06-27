@@ -1,12 +1,57 @@
-import Link from "next/link";
-import { MoreHorizontal, Phone } from "lucide-react";
+"use client";
 
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { MoreHorizontal, Phone, Trash2 } from "lucide-react";
+
+import {
+  deleteAgent,
+  useRemoveAgentFromCache,
+} from "@/hooks/use-agents";
 import type { Agent } from "@/lib/aria/types";
 import { agentGradient } from "@/lib/aria/mock-data";
 
 export function AgentCard({ agent }: { agent: Agent }) {
+  const removeAgentFromCache = useRemoveAgentFromCache();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const isActive = agent.status === "active";
   const canUseLiveVoice = agent.voiceAllowed && agent.voice.enabled;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [menuOpen]);
+
+  const handleDelete = async () => {
+    if (agent.isDefault || deleting) return;
+
+    setMenuOpen(false);
+    const confirmed = window.confirm(
+      `Delete "${agent.name}"? All conversations and memories for this agent will be removed. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      await deleteAgent(agent.id);
+      removeAgentFromCache(agent.id);
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : "Failed to delete agent"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div
@@ -100,15 +145,43 @@ export function AgentCard({ agent }: { agent: Agent }) {
             Talk live
           </span>
         )}
-        <button className="h-9 rounded-full border border-aria-border bg-aria-elevated px-3.5 text-[13px] font-medium text-aria-text-secondary transition-colors hover:border-aria-border hover:text-aria-text">
-          Settings
-        </button>
-        <button
-          aria-label="More"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-aria-border bg-aria-elevated text-aria-text-secondary transition-colors hover:text-aria-text"
+        <Link
+          href={`/agents/${agent.id}/settings`}
+          className="h-9 rounded-full border border-aria-border bg-aria-elevated px-3.5 text-[13px] font-medium text-aria-text-secondary transition-colors hover:border-aria-border hover:text-aria-text"
         >
-          <MoreHorizontal className="size-4" />
-        </button>
+          Settings
+        </Link>
+        <div ref={menuRef} className="relative shrink-0">
+          <button
+            type="button"
+            aria-label="More"
+            aria-expanded={menuOpen}
+            disabled={deleting}
+            onClick={() => setMenuOpen((open) => !open)}
+            className="flex size-9 items-center justify-center rounded-full border border-aria-border bg-aria-elevated text-aria-text-secondary transition-colors hover:text-aria-text disabled:opacity-50"
+          >
+            <MoreHorizontal className="size-4" />
+          </button>
+          {menuOpen && (
+            <div className="aria-pop absolute right-0 bottom-[calc(100%+6px)] z-50 min-w-[160px] rounded-[12px] border border-aria-border bg-aria-elevated p-1 shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
+              {!agent.isDefault ? (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-left text-[13px] font-medium text-aria-danger transition-colors hover:bg-aria-danger/10 disabled:opacity-50"
+                >
+                  <Trash2 className="size-3.5" />
+                  {deleting ? "Deleting…" : "Delete agent"}
+                </button>
+              ) : (
+                <p className="px-3 py-2 text-[12px] text-aria-text-muted">
+                  Default agent cannot be deleted
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

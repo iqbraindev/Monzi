@@ -1,4 +1,6 @@
 import type { DbAgent } from "@/lib/agents/adapter";
+import { clampElevenLabsSpeed } from "@/lib/voice/sanitize-speech";
+import { normalizeAgentVoiceId } from "@/lib/voice/voice-options";
 
 const ELEVENLABS_API = "https://api.elevenlabs.io";
 
@@ -44,7 +46,7 @@ export interface VoiceOverrides {
     firstMessage: string;
     language: string;
   };
-  tts?: { voiceId: string };
+  tts?: { voiceId: string; speed?: number };
 }
 
 /**
@@ -57,7 +59,7 @@ function buildVoicePrompt(agent: DbAgent): string {
 
 /**
  * ElevenLabs voice ids are ~20-char opaque strings (e.g. "cjVigY5qzO86Huf0OWal"),
- * not human names like the OpenAI "nova"/"alloy" presets stored on some agents.
+ * not human names like legacy OpenAI presets stored on some agents.
  */
 function isElevenLabsVoiceId(value: string | undefined): value is string {
   return Boolean(value && /^[A-Za-z0-9]{16,}$/.test(value));
@@ -65,29 +67,30 @@ function isElevenLabsVoiceId(value: string | undefined): value is string {
 
 /** Resolves the voice id for a call: per-agent ElevenLabs voice → env default. */
 export function resolveVoiceId(agent: DbAgent): string | undefined {
-  const agentVoice = agent.voice?.voice_id;
-  if (agent.voice?.provider === "elevenlabs" && isElevenLabsVoiceId(agentVoice)) {
-    return agentVoice;
+  const normalized = normalizeAgentVoiceId(agent.voice?.voice_id);
+  if (agent.voice?.provider === "elevenlabs" || isElevenLabsVoiceId(normalized)) {
+    return normalized;
   }
   const envDefault = process.env.ELEVENLABS_DEFAULT_VOICE_ID;
-  return isElevenLabsVoiceId(envDefault) ? envDefault : undefined;
+  return isElevenLabsVoiceId(envDefault) ? envDefault : normalized;
 }
 
 export function buildVoiceOverrides(agent: DbAgent): VoiceOverrides {
   const language = agent.personality?.language?.trim() || "en";
-  const firstMessage = `Hi, I'm ${agent.name}. How can I help?`;
 
   const overrides: VoiceOverrides = {
     agent: {
       prompt: { prompt: buildVoicePrompt(agent) },
-      firstMessage,
+      // Empty — Monzi custom LLM speaks the one-time intro; prevents EL replay on empty LLM responses.
+      firstMessage: "",
       language,
     },
   };
 
   const voiceId = resolveVoiceId(agent);
+  const speed = clampElevenLabsSpeed(agent.voice?.speed ?? 1);
   if (voiceId) {
-    overrides.tts = { voiceId };
+    overrides.tts = { voiceId, speed };
   }
 
   return overrides;

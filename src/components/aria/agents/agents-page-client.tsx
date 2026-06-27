@@ -1,27 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import { AgentCard } from "@/components/aria/agents/agent-card";
-import { CreateAgentModal } from "@/components/aria/agents/create-agent-modal";
-import { useAgents, useInvalidateAgents } from "@/hooks/use-agents";
+import { useAgents, useAgentsMeta } from "@/hooks/use-agents";
 
 export function AgentsPageClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { data: agents = [], isLoading, error } = useAgents();
-  const invalidateAgents = useInvalidateAgents();
-  const [createOpen, setCreateOpen] = useState(false);
-
-  const openCreate = useCallback(() => setCreateOpen(true), []);
-  const closeCreate = useCallback(() => setCreateOpen(false), []);
+  const { data: meta } = useAgentsMeta();
 
   useEffect(() => {
     if (searchParams.get("create") === "1") {
-      setCreateOpen(true);
+      router.replace("/agents/new");
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
+
+  const limitBadge =
+    meta && meta.limit >= 0
+      ? `${meta.count} of ${meta.limit} agents`
+      : `${agents.length} agents`;
 
   return (
     <div className="mx-auto w-full max-w-[1180px] px-7 pt-7 pb-10">
@@ -37,7 +38,7 @@ export function AgentsPageClient() {
         <div className="flex flex-col items-end gap-2">
           <button
             type="button"
-            onClick={openCreate}
+            onClick={() => router.push("/agents/new")}
             className="aria-gradient inline-flex h-10 cursor-pointer items-center gap-2 rounded-full px-[18px] text-sm font-semibold text-white shadow-[0_6px_20px_rgba(124,58,237,0.3)] transition-[filter] hover:brightness-110"
           >
             <Plus className="size-4" />
@@ -45,7 +46,7 @@ export function AgentsPageClient() {
           </button>
           <div className="flex items-center gap-2.5">
             <span className="font-mono text-xs text-aria-text-secondary">
-              {agents.length} agents
+              {limitBadge}
             </span>
           </div>
         </div>
@@ -67,7 +68,7 @@ export function AgentsPageClient() {
 
         <button
           type="button"
-          onClick={openCreate}
+          onClick={() => router.push("/agents/new")}
           className="flex min-h-[300px] cursor-pointer flex-col items-center justify-center gap-3 rounded-[18px] border-[1.5px] border-dashed border-aria-border text-aria-text-secondary transition-all hover:border-aria-primary hover:bg-aria-primary/5 hover:text-aria-primary-light"
         >
           <span className="flex size-[54px] items-center justify-center rounded-full border-[1.5px] border-current">
@@ -79,13 +80,6 @@ export function AgentsPageClient() {
           </span>
         </button>
       </div>
-
-      {createOpen && (
-        <CreateAgentModal
-          onClose={closeCreate}
-          onCreated={invalidateAgents}
-        />
-      )}
     </div>
   );
 }

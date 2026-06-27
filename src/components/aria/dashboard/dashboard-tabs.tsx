@@ -1,16 +1,22 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
+import { useInvalidateDashboards } from "@/hooks/use-dashboards";
 
 export function DashboardTabs() {
   const dashboards = useDashboardStore((s) => s.dashboards);
   const activeDashboardId = useDashboardStore((s) => s.activeDashboardId);
   const setActiveDashboard = useDashboardStore((s) => s.setActiveDashboard);
   const setPickerOpen = useDashboardStore((s) => s.setPickerOpen);
+  const setCreateModalOpen = useDashboardStore((s) => s.setCreateModalOpen);
+  const removeDashboard = useDashboardStore((s) => s.removeDashboard);
   const hydrated = useDashboardStore((s) => s.hydrated);
+  const invalidate = useInvalidateDashboards();
+  const [deleting, setDeleting] = useState(false);
 
   if (!hydrated) {
     return (
@@ -19,6 +25,42 @@ export function DashboardTabs() {
       </div>
     );
   }
+
+  if (dashboards.length === 0) {
+    return null;
+  }
+
+  const hasActive = Boolean(activeDashboardId);
+  const activeDashboard = dashboards.find((d) => d.id === activeDashboardId);
+
+  const handleDeleteDashboard = async () => {
+    if (!activeDashboard || deleting) return;
+
+    const confirmed = window.confirm(
+      `Delete "${activeDashboard.name}"? All widgets on this dashboard will be removed. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/dashboard/${encodeURIComponent(activeDashboard.id)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        throw new Error(data.error ?? "Failed to delete dashboard");
+      }
+      removeDashboard(activeDashboard.id);
+      invalidate();
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : "Failed to delete dashboard"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="shrink-0">
@@ -42,12 +84,31 @@ export function DashboardTabs() {
           );
         })}
         <button
-          onClick={() => setPickerOpen(true)}
+          onClick={() => setCreateModalOpen(true)}
           className="ml-2 flex h-[30px] items-center gap-1.5 rounded-full border border-dashed border-aria-border px-3 text-[13px] font-medium whitespace-nowrap text-aria-text-secondary transition-colors hover:border-aria-primary hover:text-aria-primary-light"
+        >
+          <Plus className="size-3.5" />
+          New dashboard
+        </button>
+        <button
+          onClick={() => setPickerOpen(true)}
+          disabled={!hasActive}
+          className="ml-1 flex h-[30px] items-center gap-1.5 rounded-full border border-dashed border-aria-border px-3 text-[13px] font-medium whitespace-nowrap text-aria-text-secondary transition-colors hover:border-aria-primary hover:text-aria-primary-light disabled:cursor-not-allowed disabled:opacity-45"
         >
           <Plus className="size-3.5" />
           Add widget
         </button>
+        {activeDashboard && (
+          <button
+            type="button"
+            onClick={() => void handleDeleteDashboard()}
+            disabled={deleting}
+            className="ml-1 flex h-[30px] items-center gap-1.5 rounded-full border border-aria-border px-3 text-[13px] font-medium whitespace-nowrap text-aria-text-secondary transition-colors hover:border-aria-danger/40 hover:bg-aria-danger/10 hover:text-aria-danger disabled:opacity-50"
+          >
+            <Trash2 className="size-3.5" />
+            {deleting ? "Deleting…" : "Delete dashboard"}
+          </button>
+        )}
       </div>
       <div className="mx-6 h-px bg-aria-border-subtle" />
     </div>

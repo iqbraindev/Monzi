@@ -46,6 +46,7 @@ export const AGENTS: Agent[] = [
     ],
     voice: DEFAULT_VOICE,
     voiceAllowed: true,
+    isDefault: true,
   },
   {
     id: "max",
@@ -72,6 +73,7 @@ export const AGENTS: Agent[] = [
     ],
     voice: DEFAULT_VOICE,
     voiceAllowed: true,
+    isDefault: false,
   },
   {
     id: "alex",
@@ -98,6 +100,7 @@ export const AGENTS: Agent[] = [
     ],
     voice: { ...DEFAULT_VOICE, enabled: false },
     voiceAllowed: true,
+    isDefault: false,
   },
   {
     id: "ivy",
@@ -124,6 +127,7 @@ export const AGENTS: Agent[] = [
     ],
     voice: DEFAULT_VOICE,
     voiceAllowed: true,
+    isDefault: false,
   },
 ];
 
@@ -261,6 +265,11 @@ export const INTEGRATION_PERMISSIONS: Record<string, string[]> = {
   Slack: ["Read messages in channels you choose", "Post messages and summaries", "See your workspace members"],
   GitHub: ["Read issues, pull requests, and repos", "Comment on issues and PRs", "See repository activity"],
   Asana: ["Read your projects and tasks", "Create and update tasks", "See assignees and due dates"],
+  HighLevel: [
+    "Read contacts, opportunities, and calendars",
+    "Create and update leads and appointments",
+    "Manage campaigns and conversations",
+  ],
 };
 
 export const DEFAULT_INTEGRATION_PERMISSIONS = [

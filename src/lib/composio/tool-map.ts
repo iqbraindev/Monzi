@@ -11,13 +11,13 @@ export const WIDGET_TOOL_MAP: Partial<Record<DashboardWidgetId, WidgetToolConfig
   email: {
     tool: "GMAIL_FETCH_EMAILS",
     toolkit: "gmail",
-    defaultParams: { max_results: 10 },
+    defaultParams: { max_results: 10, verbose: false },
     cacheTtlSec: 120,
   },
   tasks: {
-    tool: "NOTION_FETCH_NOTION_CHILD_BLOCK",
+    tool: "NOTION_SEARCH_NOTION_PAGE",
     toolkit: "notion",
-    defaultParams: { page_size: 15 },
+    defaultParams: { query: "", page_size: 15 },
     cacheTtlSec: 180,
   },
   calendar: {

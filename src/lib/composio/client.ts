@@ -18,6 +18,7 @@ export function getComposio() {
     composioClient = new Composio({
       apiKey: getComposioApiKey(),
       host: process.env.NEXT_PUBLIC_APP_NAME ?? "Monzi",
+      toolkitVersions: "latest",
     });
   }
   return composioClient;
@@ -30,6 +31,7 @@ export function getComposioLangChain() {
       apiKey: getComposioApiKey(),
       host: process.env.NEXT_PUBLIC_APP_NAME ?? "Monzi",
       provider: new LangchainProvider(),
+      toolkitVersions: "latest",
     });
   }
   return composioLangChainClient;

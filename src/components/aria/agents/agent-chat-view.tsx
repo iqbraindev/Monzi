@@ -11,7 +11,6 @@ import {
   Check,
   Send,
   Square,
-  RotateCcw,
   MessageSquarePlus,
   Phone,
   PhoneOff,
@@ -20,6 +19,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 
 import { AssistantMessage, UserMessage } from "@/components/aria/agents/chat-message";
+import { ChatErrorNotice } from "@/components/aria/agents/chat-error-notice";
 import {
   isComposioTool,
   isDashboardTool,
@@ -27,12 +27,13 @@ import {
 } from "@/components/aria/agents/tool-call-card";
 import { useElevenLabsVoiceSession } from "@/hooks/use-elevenlabs-voice-session";
 import {
-  LiveVoiceCallOverlay,
-  type LiveVoiceCallPhase,
-} from "@/components/aria/voice/live-voice-call-panel";
+  VoiceHologramOverlay,
+  type VoiceOverlayPhase,
+} from "@/components/aria/voice/voice-hologram-overlay";
 import { cn } from "@/lib/utils";
 import type { Agent } from "@/lib/aria/types";
 import { agentGradient } from "@/lib/aria/mock-data";
+import { writeVoiceModePreference } from "@/lib/voice/preferences";
 
 export interface ChatHistoryProps {
   agent: Agent;
@@ -80,6 +81,24 @@ function extractContextFromMessages(messages: UIMessage[]) {
   };
 }
 
+function mapVoiceSessionPhase(
+  state: ReturnType<typeof useElevenLabsVoiceSession>["state"]
+): VoiceOverlayPhase {
+  switch (state) {
+    case "greeting":
+      return "greeting";
+    case "listening":
+    case "user-speaking":
+      return "listening";
+    case "speaking":
+      return "speaking";
+    case "connecting":
+    case "thinking":
+    default:
+      return "thinking";
+  }
+}
+
 export function AgentChatView({
   agent,
   initialMessages,
@@ -110,7 +129,9 @@ export function AgentChatView({
   const [draft, setDraft] = useState("");
   const [contextOpen, setContextOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const voiceTranscriptIds = useRef<Set<string>>(new Set());
+  const voiceRefreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
   const grad = agentGradient(agent.color);
   const glow = `${agent.color}88`;
   const isStreaming = status === "streaming" || status === "submitted";
@@ -140,14 +161,11 @@ export function AgentChatView({
 
   const handleVoiceTranscription = useCallback(
     (text: string, isFinal: boolean, role: "user" | "assistant") => {
-      if (!isFinal || !text.trim()) return;
-      const key = `${role}:${text}`;
-      if (voiceTranscriptIds.current.has(key)) return;
-      voiceTranscriptIds.current.add(key);
-
-      // Custom LLM persists turns server-side; refresh chat when ElevenLabs
-      // reports a spoken line so the UI stays in sync without duplicate writes.
-      void refreshHistory();
+      if (!isFinal || !text.trim() || role !== "assistant") return;
+      clearTimeout(voiceRefreshTimer.current);
+      voiceRefreshTimer.current = setTimeout(() => {
+        void refreshHistory();
+      }, 500);
     },
     [refreshHistory]
   );
@@ -156,8 +174,7 @@ export function AgentChatView({
     voiceEnabled,
     setVoiceEnabled,
     beginVoiceSession,
-    unlockAudio,
-    needsAudioUnlock,
+    disconnect,
     canUseVoice,
     state: voiceState,
     error: voiceError,
@@ -166,7 +183,7 @@ export function AgentChatView({
     isSpeaking,
     toggleMicrophone,
     isMicrophoneEnabled,
-    disconnect,
+    micStream,
   } = useElevenLabsVoiceSession({
     agentId: agent.id,
     conversationId,
@@ -206,13 +223,25 @@ export function AgentChatView({
   }, [pendingSend, historyLoading, status, sendMessage]);
 
   useEffect(() => {
-    if (voiceEnabled) setVoicePanelOpen(true);
-  }, [voiceEnabled]);
+    return () => {
+      clearTimeout(voiceRefreshTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (voiceEnabled) {
+      setVoicePanelOpen(true);
+      if (voiceState === "idle" || voiceState === "error") {
+        void beginVoiceSession();
+      }
+    }
+  }, [voiceEnabled, voiceState, beginVoiceSession]);
 
   useEffect(() => {
     if (autoVoice && canUseVoice && !didAutoVoice.current) {
       didAutoVoice.current = true;
       setVoicePanelOpen(true);
+      writeVoiceModePreference(true);
     }
   }, [autoVoice, canUseVoice]);
 
@@ -228,24 +257,13 @@ export function AgentChatView({
   const openVoicePanel = () => {
     if (!canUseVoice) return;
     setVoicePanelOpen(true);
-  };
-
-  const dismissVoicePanel = () => {
-    setVoicePanelOpen(false);
-    setVoiceEnabled(false);
-    if (voiceState === "error") {
-      void disconnect();
-    }
-  };
-
-  const startVoiceCall = () => {
-    if (!canUseVoice) return;
     void beginVoiceSession();
   };
 
   const endVoiceCall = () => {
-    setVoiceEnabled(false);
     setVoicePanelOpen(false);
+    writeVoiceModePreference(false);
+    void disconnect();
   };
 
   const toggleLiveVoice = () => {
@@ -257,22 +275,16 @@ export function AgentChatView({
     }
   };
 
-  const liveVoicePhase: LiveVoiceCallPhase =
-    voiceState === "error"
-      ? "connecting"
-      : !voiceEnabled || voiceState === "idle"
-        ? "preview"
-        : voiceState === "connecting"
-          ? "connecting"
-          : voiceState === "greeting"
-            ? "greeting"
-            : voiceState === "speaking"
-              ? "speaking"
-              : voiceState === "thinking"
-                ? "thinking"
-                : voiceState === "user-speaking"
-                  ? "user-speaking"
-                  : "listening";
+  const voiceSessionActive =
+    voiceConnected ||
+    voiceState === "connecting" ||
+    voiceState === "greeting" ||
+    voiceState === "listening" ||
+    voiceState === "user-speaking" ||
+    voiceState === "thinking" ||
+    voiceState === "speaking";
+
+  const voicePhase = mapVoiceSessionPhase(voiceState);
 
   const send = () => {
     const text = draft.trim();
@@ -305,27 +317,18 @@ export function AgentChatView({
     .reverse()
     .find((m) => m.role === "user");
   const lastUserMessage = lastUserText ? messageText(lastUserText) : "";
-
-  const errorMessage =
-    error?.message?.includes("429") || error?.message?.includes("limit")
-      ? "You've reached your daily message limit. Try again tomorrow."
-      : error?.message;
-
   const hasDraft = draft.trim().length > 0;
 
   return (
     <div className="relative z-[1] flex min-h-0 flex-1">
-      <LiveVoiceCallOverlay
+      <VoiceHologramOverlay
         open={voicePanelOpen}
+        phase={voicePhase}
         agentName={agent.name}
         agentColor={agent.color}
-        phase={liveVoicePhase}
-        error={voiceError}
-        needsAudioUnlock={needsAudioUnlock}
-        onStartCall={startVoiceCall}
+        micStream={micStream}
+        continuousSession={voiceSessionActive}
         onEndCall={endVoiceCall}
-        onDismiss={dismissVoicePanel}
-        onUnlockAudio={() => void unlockAudio()}
       />
 
       <aside className="flex w-[280px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-aria-border-subtle bg-aria-surface/50 px-[18px] py-[22px] backdrop-blur-sm max-lg:hidden">
@@ -635,20 +638,12 @@ export function AgentChatView({
           )}
 
           {error && (
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-center text-xs text-aria-danger">
-                {errorMessage}
-              </p>
-              {lastUserMessage && (
-                <button
-                  onClick={() => void regenerate()}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-aria-border px-3 py-1 text-xs text-aria-text-secondary hover:text-aria-text"
-                >
-                  <RotateCcw className="size-3" />
-                  Retry
-                </button>
-              )}
-            </div>
+            <ChatErrorNotice
+              error={error}
+              onRetry={
+                lastUserMessage ? () => void regenerate() : undefined
+              }
+            />
           )}
         </div>
 

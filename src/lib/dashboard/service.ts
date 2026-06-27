@@ -1,16 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { listActiveConnections } from "@/lib/composio/tools";
+
 import type {
   DashboardWithWidgets,
   DbDashboard,
   DbWidget,
+  WidgetType,
 } from "@/lib/dashboard/types";
 import {
-  DEFAULT_SEED_WIDGETS,
   defaultDataSource,
   getRegistryEntry,
+  getRequiredToolkit,
   layoutForSize,
 } from "@/lib/dashboard/widget-registry";
+
+export interface DashboardSummary {
+  id: string;
+  name: string;
+  widgetCount: number;
+}
 
 export async function listDashboards(
   supabase: SupabaseClient,
@@ -45,51 +54,71 @@ export async function listDashboards(
   }));
 }
 
-export async function getDefaultDashboard(
+export async function listDashboardSummaries(
   supabase: SupabaseClient,
   userId: string
-): Promise<DashboardWithWidgets | null> {
+): Promise<DashboardSummary[]> {
   const dashboards = await listDashboards(supabase, userId);
-  return dashboards.find((d) => d.is_default) ?? dashboards[0] ?? null;
+  return dashboards.map((d) => ({
+    id: d.id,
+    name: d.name,
+    widgetCount: d.widgets.length,
+  }));
 }
 
-export async function seedDefaultDashboardIfEmpty(
+export async function resolveDashboard(
   supabase: SupabaseClient,
-  userId: string
-): Promise<void> {
-  const dashboards = await listDashboards(supabase, userId);
-  let dashboard = dashboards.find((d) => d.is_default) ?? dashboards[0];
-
-  if (!dashboard) {
-    const { data: created } = await supabase
+  userId: string,
+  params: { dashboardId?: string; dashboardName?: string }
+): Promise<DbDashboard | null> {
+  if (params.dashboardId) {
+    const { data } = await supabase
       .from("dashboards")
-      .insert({
-        user_id: userId,
-        name: "Morning Briefing",
-        icon: "🌅",
-        is_default: true,
-        created_by: "user",
-      })
       .select("*")
-      .single();
-    if (!created) return;
-    dashboard = { ...(created as DbDashboard), widgets: [] };
+      .eq("id", params.dashboardId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    return data ? (data as DbDashboard) : null;
   }
 
-  if (dashboard.widgets.length > 0) return;
+  if (params.dashboardName) {
+    const normalized = params.dashboardName.trim().toLowerCase();
+    const dashboards = await listDashboards(supabase, userId);
+    const matches = dashboards.filter(
+      (d) => d.name.trim().toLowerCase() === normalized
+    );
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) {
+      throw new Error(
+        `Multiple dashboards match "${params.dashboardName}". Ask the user to clarify.`
+      );
+    }
+    return null;
+  }
 
-  await Promise.all(
-    DEFAULT_SEED_WIDGETS.map((seed) =>
-      supabase.from("widgets").insert({
-        dashboard_id: dashboard!.id,
-        type: seed.type,
-        title: seed.title,
-        data_source: defaultDataSource(seed.type),
-        layout: seed.layout,
-        created_by: "user",
-      })
-    )
+  return null;
+}
+
+export async function assertWidgetConnection(
+  userId: string,
+  type: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const toolkit = getRequiredToolkit(type);
+  if (!toolkit) return { ok: true };
+
+  const connections = await listActiveConnections(userId);
+  const connected = connections.some(
+    (c) => c.toolkit?.slug?.toLowerCase() === toolkit.toLowerCase()
   );
+
+  if (connected) return { ok: true };
+
+  const reg = getRegistryEntry(type);
+  const appName = reg?.label ?? toolkit;
+  return {
+    ok: false,
+    message: `${appName} requires connecting ${toolkit} in Integrations before adding this widget.`,
+  };
 }
 
 export async function createDashboard(
@@ -119,9 +148,79 @@ export async function createDashboard(
   return data as DbDashboard;
 }
 
+export async function updateDashboard(
+  supabase: SupabaseClient,
+  params: {
+    userId: string;
+    dashboardId: string;
+    name?: string;
+    icon?: string;
+    description?: string;
+  }
+): Promise<DbDashboard> {
+  const updates: Record<string, string | null> = {};
+  if (params.name !== undefined) updates.name = params.name;
+  if (params.icon !== undefined) updates.icon = params.icon;
+  if (params.description !== undefined) updates.description = params.description;
+
+  if (Object.keys(updates).length === 0) {
+    throw new Error("No fields to update");
+  }
+
+  const { data, error } = await supabase
+    .from("dashboards")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", params.dashboardId)
+    .eq("user_id", params.userId)
+    .select("*")
+    .single();
+
+  if (error || !data) throw new Error(error?.message ?? "Failed to update dashboard");
+  return data as DbDashboard;
+}
+
+export async function deleteDashboard(
+  supabase: SupabaseClient,
+  userId: string,
+  dashboardId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("dashboards")
+    .delete()
+    .eq("id", dashboardId)
+    .eq("user_id", userId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteWidget(
+  supabase: SupabaseClient,
+  userId: string,
+  dashboardId: string,
+  widgetId: string
+): Promise<void> {
+  const { data: dashboard } = await supabase
+    .from("dashboards")
+    .select("id")
+    .eq("id", dashboardId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!dashboard) throw new Error("Dashboard not found");
+
+  const { error } = await supabase
+    .from("widgets")
+    .delete()
+    .eq("id", widgetId)
+    .eq("dashboard_id", dashboardId);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function createWidget(
   supabase: SupabaseClient,
   params: {
+    userId: string;
     dashboardId: string;
     type: string;
     title: string;
@@ -129,11 +228,17 @@ export async function createWidget(
     layout?: import("@/lib/dashboard/types").WidgetLayout;
     size?: "small" | "medium" | "large";
     createdBy?: "user" | "agent";
+    skipConnectionCheck?: boolean;
   }
 ): Promise<DbWidget> {
+  if (!params.skipConnectionCheck) {
+    const check = await assertWidgetConnection(params.userId, params.type);
+    if (!check.ok) throw new Error(check.message);
+  }
+
   const reg = getRegistryEntry(params.type);
   const dataSource = {
-    ...defaultDataSource((params.type as import("@/lib/dashboard/types").WidgetType) || "insights"),
+    ...defaultDataSource((params.type as WidgetType) || "insights"),
     ...params.dataSource,
   };
 

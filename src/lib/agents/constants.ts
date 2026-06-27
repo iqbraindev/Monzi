@@ -1,10 +1,11 @@
-export const AGENT_ROLE_PRESETS = [
-  { label: "Business Assistant", value: "business_assistant", color: "#7C3AED" },
-  { label: "Finance Advisor", value: "finance_advisor", color: "#06B6D4" },
-  { label: "CRM & Clients", value: "crm_clients", color: "#10B981" },
-  { label: "Content Creator", value: "content_creator", color: "#F59E0B" },
-  { label: "General Assistant", value: "general_assistant", color: "#6366F1" },
-] as const;
+import { ROLE_PRESETS } from "@/lib/agents/presets";
+
+/** @deprecated Use ROLE_PRESETS from presets.ts */
+export const AGENT_ROLE_PRESETS = ROLE_PRESETS.map((r) => ({
+  label: r.label,
+  value: r.value,
+  color: r.color,
+}));
 
 export const AGENT_COLOR_OPTIONS = [
   "#7C3AED",
@@ -13,4 +14,31 @@ export const AGENT_COLOR_OPTIONS = [
   "#F59E0B",
   "#F43F5E",
   "#6366F1",
+] as const;
+
+export const AGENT_AVATAR_PRESETS = [
+  { id: "avatar-01", label: "Nova", style: "lottie" as const },
+  { id: "avatar-02", label: "Pulse", style: "lottie" as const },
+  { id: "avatar-03", label: "Orbit", style: "lottie" as const },
+  { id: "avatar-04", label: "Spark", style: "lottie" as const },
+  { id: "avatar-05", label: "Flux", style: "minimal" as const },
+  { id: "avatar-06", label: "Echo", style: "minimal" as const },
+  { id: "avatar-07", label: "Prism", style: "illustrated" as const },
+  { id: "avatar-08", label: "Aura", style: "illustrated" as const },
+] as const;
+
+/** @deprecated Use FALLBACK_VOICE_OPTIONS from @/lib/voice/voice-options */
+export const VOICE_OPTIONS = [
+  { id: "EXAVITQu4vr4xnSDxMaL", label: "Sarah", provider: "elevenlabs" as const },
+  { id: "cjVigY5qzO86Huf0OWal", label: "Eric", provider: "elevenlabs" as const },
+  { id: "JBFqnCBsd6RMkjVDRZzb", label: "George", provider: "elevenlabs" as const },
+  { id: "IKne3meq5aSn9XLyUdCD", label: "Charlie", provider: "elevenlabs" as const },
+] as const;
+
+export const LANGUAGE_OPTIONS = [
+  { value: "en", label: "English" },
+  { value: "fr", label: "French" },
+  { value: "ar", label: "Arabic" },
+  { value: "es", label: "Spanish" },
+  { value: "de", label: "German" },
 ] as const;

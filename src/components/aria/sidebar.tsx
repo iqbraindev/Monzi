@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import {
   LayoutDashboard,
   Bot,
@@ -9,6 +10,7 @@ import {
   Users,
   CreditCard,
   Settings,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 
@@ -64,10 +66,12 @@ function NavLink({
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useUser();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const activeAgentId = useUIStore((s) => s.activeAgentId);
   const expanded = !collapsed;
   const agent = getAgent(activeAgentId ?? "nova");
+  const isSuperAdmin = user?.publicMetadata?.role === "super_admin";
 
   return (
     <aside
@@ -120,6 +124,21 @@ export function Sidebar() {
             active={pathname === item.href || pathname.startsWith(item.href + "/")}
           />
         ))}
+
+        {isSuperAdmin && (
+          <>
+            {expanded && (
+              <div className="px-3 pt-3.5 pb-1.5 text-[11px] font-semibold tracking-[0.08em] text-aria-text-muted uppercase">
+                Admin
+              </div>
+            )}
+            <NavLink
+              item={{ label: "Packages", href: "/admin/packs", icon: Shield }}
+              expanded={expanded}
+              active={pathname.startsWith("/admin")}
+            />
+          </>
+        )}
       </nav>
 
       {/* Active agent + plan */}

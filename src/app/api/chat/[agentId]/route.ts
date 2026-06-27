@@ -6,6 +6,7 @@ import {
   prepareAgentTurn,
   streamAgentTurn,
 } from "@/lib/agents/run-agent-turn";
+import { assertAgentHasEnergy } from "@/lib/billing/energy";
 import { formatAiErrorMessage } from "@/lib/ai/user-facing-errors";
 import { getRedisOptional } from "@/lib/redis/optional";
 import { ensureSupabaseUser } from "@/lib/users/provision";
@@ -51,6 +52,11 @@ export async function POST(
 
     if (!ctx) {
       return Response.json({ error: "Agent not found" }, { status: 404 });
+    }
+
+    const energyCheck = await assertAgentHasEnergy(userId, ctx.agent);
+    if (!energyCheck.ok) {
+      return Response.json({ error: energyCheck.message }, { status: 402 });
     }
 
     const lastUser = [...messages].reverse().find((m) => m.role === "user");

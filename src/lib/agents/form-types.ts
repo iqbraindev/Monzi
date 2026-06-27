@@ -53,6 +53,8 @@ export interface AgentBuilderDraft {
   personality: AgentBuilderPersonality;
   voice: AgentBuilderVoice;
   tools: AgentBuilderTools;
+  /** Monthly token budget for this agent (energy credits). */
+  energy_limit_monthly: number;
 }
 
 export const DEFAULT_AGENT_BUILDER_DRAFT: AgentBuilderDraft = {
@@ -86,6 +88,7 @@ export const DEFAULT_AGENT_BUILDER_DRAFT: AgentBuilderDraft = {
     file_access: false,
     calculator: true,
   },
+  energy_limit_monthly: 50_000,
 };
 
 export type WizardStep =
@@ -94,6 +97,7 @@ export type WizardStep =
   | "persona"
   | "apps"
   | "voice"
+  | "energy"
   | "review";
 
 export const WIZARD_STEPS: WizardStep[] = [
@@ -102,6 +106,7 @@ export const WIZARD_STEPS: WizardStep[] = [
   "persona",
   "apps",
   "voice",
+  "energy",
   "review",
 ];
 
@@ -111,6 +116,7 @@ export type StudioTab =
   | "persona"
   | "apps"
   | "voice"
+  | "energy"
   | "advanced";
 
 export const STUDIO_TABS: { id: StudioTab; label: string }[] = [
@@ -119,7 +125,8 @@ export const STUDIO_TABS: { id: StudioTab; label: string }[] = [
   { id: "persona", label: "Persona" },
   { id: "apps", label: "Apps" },
   { id: "voice", label: "Voice" },
+  { id: "energy", label: "Energy" },
   { id: "advanced", label: "Advanced" },
 ];
 
-export const DRAFT_STORAGE_KEY = "monzi-agent-draft-v4";
+export const DRAFT_STORAGE_KEY = "monzi-agent-draft-v5";

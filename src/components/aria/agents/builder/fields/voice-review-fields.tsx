@@ -10,6 +10,7 @@ import {
 } from "@/components/aria/agents/builder/agent-builder-shell";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
 import { getLlmModelLabel } from "@/lib/agents/llm-models";
+import { formatEnergyTokens } from "@/lib/billing/energy";
 import {
   DEFAULT_AGENT_VOICE_ID,
   FALLBACK_VOICE_OPTIONS,
@@ -263,6 +264,10 @@ export function ReviewSummary({ draft, connectedSlugs = [] }: ReviewSummaryProps
           }
         />
         <Row label="Voice" value={voiceLabel} />
+        <Row
+          label="Energy"
+          value={`${formatEnergyTokens(draft.energy_limit_monthly)} / mo`}
+        />
         {draft.personality.custom_instructions?.trim() && (
           <Row label="Instructions" value="Custom rules added" />
         )}

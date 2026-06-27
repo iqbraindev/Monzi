@@ -7,6 +7,10 @@ import {
 } from "@/lib/agents/api-body";
 import { getUserVoiceEnabled } from "@/lib/billing/limits";
 import {
+  clampEnergyLimitForPlan,
+  getPlanEnergyLimits,
+} from "@/lib/billing/energy";
+import {
   getConnectedToolkitSlugs,
 } from "@/lib/composio/agent-toolkits";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
@@ -89,6 +93,14 @@ export async function PATCH(
     body.composio_apps = filterComposioAppsForConnected(
       body.composio_apps,
       connectedToolkits
+    );
+  }
+
+  if (typeof body.energy_limit_monthly === "number") {
+    const planEnergy = await getPlanEnergyLimits(userId);
+    body.energy_limit_monthly = clampEnergyLimitForPlan(
+      body.energy_limit_monthly,
+      planEnergy
     );
   }
 

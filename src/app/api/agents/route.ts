@@ -11,6 +11,10 @@ import {
   getUserVoiceEnabled,
 } from "@/lib/billing/limits";
 import {
+  clampEnergyLimitForPlan,
+  getPlanEnergyLimits,
+} from "@/lib/billing/energy";
+import {
   getConnectedToolkitSlugs,
 } from "@/lib/composio/agent-toolkits";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
@@ -129,6 +133,12 @@ export async function POST(req: Request) {
   draft.tools.composio_apps = filterComposioAppsForConnected(
     draft.tools.composio_apps,
     connectedSlugs
+  );
+
+  const planEnergy = await getPlanEnergyLimits(userId);
+  draft.energy_limit_monthly = clampEnergyLimitForPlan(
+    draft.energy_limit_monthly || planEnergy.defaultMonthly,
+    planEnergy
   );
 
   const { data: agent, error } = await supabase

@@ -20,6 +20,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { AssistantMessage, UserMessage } from "@/components/aria/agents/chat-message";
 import { ChatErrorNotice } from "@/components/aria/agents/chat-error-notice";
 import { AgentActivitiesModal } from "@/components/aria/agents/agent-activities-modal";
+import { AgentEnergyMeter } from "@/components/aria/agents/agent-energy-meter";
 import { AgentConversationList } from "@/components/aria/agents/agent-conversation-list";
 import {
   ConnectedAppIcon,
@@ -36,6 +37,7 @@ import {
   useAgentConversations,
   useInvalidateAgentConversations,
 } from "@/hooks/use-agent-conversations";
+import { useInvalidateAgentEnergy } from "@/hooks/use-agent-energy";
 import {
   VoiceHologramOverlay,
   type VoiceOverlayPhase,
@@ -137,6 +139,7 @@ export function AgentChatView({
   const { data: conversations = [], isLoading: convosLoading } =
     useAgentConversations(agent.id);
   const invalidateConversations = useInvalidateAgentConversations();
+  const invalidateEnergy = useInvalidateAgentEnergy();
 
   const transport = useMemo(
     () =>
@@ -382,9 +385,10 @@ export function AgentChatView({
       conversationId
     ) {
       invalidateConversations(agent.id);
+      invalidateEnergy(agent.id);
     }
     prevStatus.current = status;
-  }, [status, conversationId, agent.id, invalidateConversations]);
+  }, [status, conversationId, agent.id, invalidateConversations, invalidateEnergy]);
 
   const lastUserText = [...messages]
     .reverse()
@@ -411,7 +415,8 @@ export function AgentChatView({
         toolActions={toolActions}
       />
 
-      <aside className="flex w-[280px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-aria-border-subtle bg-aria-surface/50 px-[18px] py-[22px] backdrop-blur-sm max-lg:hidden">
+      <aside className="flex w-[280px] shrink-0 flex-col min-h-0 border-r border-aria-border-subtle bg-aria-surface/50 px-[18px] py-[22px] backdrop-blur-sm max-lg:hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
         <button
           type="button"
           onClick={() => setActivitiesOpen(true)}
@@ -487,6 +492,11 @@ export function AgentChatView({
             </div>
           )}
         </Section>
+        </div>
+
+        <div className="shrink-0 pt-3">
+          <AgentEnergyMeter agentId={agent.id} />
+        </div>
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">

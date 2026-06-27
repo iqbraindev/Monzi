@@ -16,6 +16,7 @@ import {
   ToolsTogglesFields,
 } from "@/components/aria/agents/builder/fields/persona-fields";
 import { VoiceFields } from "@/components/aria/agents/builder/fields/voice-review-fields";
+import { EnergyLimitFields } from "@/components/aria/agents/builder/fields/energy-limit-fields";
 import { AppConnectPanel } from "@/components/aria/integrations/app-connect-panel";
 import {
   dbAgentToDraft,
@@ -29,6 +30,7 @@ import {
   useRemoveAgentFromCache,
 } from "@/hooks/use-agents";
 import { useComposioConnections } from "@/hooks/use-composio-connections";
+import { usePlanEnergyLimits } from "@/hooks/use-agent-energy";
 import type { StudioTab } from "@/lib/agents/form-types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -54,6 +56,10 @@ export function AgentBuilderStudio({
     setComposioApps,
     setDraft,
   } = useAgentBuilderForm({ persist: false });
+
+  const { data: energyLimits } = usePlanEnergyLimits();
+  const planDefault = energyLimits?.defaultMonthly ?? 50_000;
+  const planMax = energyLimits?.maxMonthly ?? 200_000;
 
   const { data: connections = [] } = useComposioConnections();
   const connectedList = useMemo(
@@ -174,6 +180,14 @@ export function AgentBuilderStudio({
       <VoiceFields
         draft={draft}
         voiceAllowed={voiceAllowed}
+        onChange={updateDraft}
+      />
+    ),
+    energy: (
+      <EnergyLimitFields
+        draft={draft}
+        planDefault={planDefault}
+        planMax={planMax}
         onChange={updateDraft}
       />
     ),

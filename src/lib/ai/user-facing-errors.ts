@@ -56,6 +56,10 @@ export function formatAiErrorMessage(error: unknown): string {
   const text = collectErrorText(error).toLowerCase();
   const status = statusFromError(error);
 
+  if (text.includes("energy credits")) {
+    return "This agent has used all of its energy credits for this month. Increase the limit in agent settings or upgrade your plan.";
+  }
+
   if (
     status === 402 ||
     text.includes("insufficient credits") ||

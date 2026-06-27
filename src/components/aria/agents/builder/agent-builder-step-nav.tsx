@@ -10,6 +10,7 @@ const STEP_LABELS: Record<WizardStep, string> = {
   persona: "Persona",
   apps: "Apps",
   voice: "Voice",
+  energy: "Energy",
   review: "Review",
 };
 

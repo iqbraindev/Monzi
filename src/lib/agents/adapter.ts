@@ -40,6 +40,7 @@ export interface DbAgent {
     calculator?: boolean;
   };
   voice?: DbAgentVoice;
+  energy_limit_monthly?: number;
   is_active: boolean;
   is_default: boolean;
   created_at: string;

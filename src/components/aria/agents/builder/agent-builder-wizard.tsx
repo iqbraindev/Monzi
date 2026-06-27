@@ -16,6 +16,7 @@ import {
   ReviewSummary,
   VoiceFields,
 } from "@/components/aria/agents/builder/fields/voice-review-fields";
+import { EnergyLimitFields } from "@/components/aria/agents/builder/fields/energy-limit-fields";
 import { AppConnectPanel } from "@/components/aria/integrations/app-connect-panel";
 import {
   clearAgentDraft,
@@ -27,6 +28,7 @@ import {
   useInvalidateAgents,
 } from "@/hooks/use-agents";
 import { useComposioConnections } from "@/hooks/use-composio-connections";
+import { usePlanEnergyLimits } from "@/hooks/use-agent-energy";
 import type { WizardStep } from "@/lib/agents/form-types";
 import { WIZARD_STEPS } from "@/lib/agents/form-types";
 
@@ -56,11 +58,15 @@ export function AgentBuilderWizard({
     goToStep,
   } = useAgentBuilderForm();
 
+  const { data: energyLimits } = usePlanEnergyLimits();
   const { data: connections = [] } = useComposioConnections();
   const connectedList = useMemo(
     () => connections.map((c) => c.toolkit),
     [connections]
   );
+
+  const planDefault = energyLimits?.defaultMonthly ?? 50_000;
+  const planMax = energyLimits?.maxMonthly ?? 200_000;
 
   const handleToggleApp = useCallback(
     (slug: string, enabled: boolean) => {
@@ -117,9 +123,9 @@ export function AgentBuilderWizard({
   };
 
   const handleSkip = () => {
-    if (step === "apps" || step === "voice") {
-      goToStep("review");
-    }
+    if (step === "apps") goToStep("voice");
+    else if (step === "voice") goToStep("energy");
+    else if (step === "energy") goToStep("review");
   };
 
   const stepContent: Record<WizardStep, React.ReactNode> = {
@@ -159,6 +165,14 @@ export function AgentBuilderWizard({
         onChange={updateDraft}
       />
     ),
+    energy: (
+      <EnergyLimitFields
+        draft={draft}
+        planDefault={planDefault}
+        planMax={planMax}
+        onChange={updateDraft}
+      />
+    ),
     review: (
       <ReviewSummary draft={draft} connectedSlugs={connectedList} />
     ),
@@ -187,12 +201,14 @@ export function AgentBuilderWizard({
           continueLabel={step === "review" ? "Create agent & chat" : "Continue"}
           loading={submitting}
           skipLabel={
-            step === "apps" || step === "voice"
+            step === "apps" || step === "voice" || step === "energy"
               ? "Skip setup, I'll do it later"
               : undefined
           }
           onSkip={
-            step === "apps" || step === "voice" ? handleSkip : undefined
+            step === "apps" || step === "voice" || step === "energy"
+              ? handleSkip
+              : undefined
           }
         />
       }

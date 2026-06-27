@@ -22,6 +22,7 @@ import { getLangChainTools, listActiveConnections } from "@/lib/composio/tools";
 import { TOOLKIT_CATALOG } from "@/lib/composio/toolkits";
 import { getDashboardTools } from "@/lib/dashboard/tools";
 import { listDashboardSummaries } from "@/lib/dashboard/service";
+import { incrementUserTokenUsage } from "@/lib/billing/energy";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export interface AgentTurnContext {
@@ -162,7 +163,8 @@ export async function persistAssistantMessage(
   ctx: AgentTurnContext,
   text: string,
   toolCalls?: unknown,
-  toolResults?: unknown
+  toolResults?: unknown,
+  tokensUsed = 0
 ): Promise<void> {
   const trimmed = text.trim();
   if (!trimmed) return;
@@ -183,6 +185,7 @@ export async function persistAssistantMessage(
     content: trimmed,
     tool_calls: toolCalls ? toolCalls : null,
     tool_results: toolResults ? toolResults : null,
+    tokens_used: tokensUsed > 0 ? tokensUsed : null,
   });
   await ctx.supabase
     .from("conversations")
@@ -213,13 +216,25 @@ export async function streamAgentTurn(
       }
       console.error("[agent-turn]", error);
     },
-    onFinish: async ({ text, toolCalls, toolResults }) => {
+    onFinish: async ({ text, toolCalls, toolResults, usage }) => {
+      const tokens = usage?.totalTokens ?? 0;
       await persistAssistantMessage(
         ctx,
         text,
         toolCalls?.length ? toolCalls : undefined,
-        toolResults?.length ? toolResults : undefined
+        toolResults?.length ? toolResults : undefined,
+        tokens
       );
+      if (tokens > 0) {
+        const { data: convo } = await ctx.supabase
+          .from("conversations")
+          .select("user_id")
+          .eq("id", ctx.conversationId)
+          .single();
+        if (convo?.user_id) {
+          await incrementUserTokenUsage(convo.user_id, tokens);
+        }
+      }
     },
   });
 }
@@ -242,8 +257,22 @@ export async function executeAgentTurn(
     ctx,
     result.text,
     result.toolCalls?.length ? result.toolCalls : undefined,
-    result.toolResults?.length ? result.toolResults : undefined
+    result.toolResults?.length ? result.toolResults : undefined,
+    result.totalUsage?.totalTokens ?? result.usage?.totalTokens ?? 0
   );
+
+  const tokens =
+    result.totalUsage?.totalTokens ?? result.usage?.totalTokens ?? 0;
+  if (tokens > 0) {
+    const { data: convo } = await ctx.supabase
+      .from("conversations")
+      .select("user_id")
+      .eq("id", ctx.conversationId)
+      .single();
+    if (convo?.user_id) {
+      await incrementUserTokenUsage(convo.user_id, tokens);
+    }
+  }
 
   return {
     assistantText: result.text,

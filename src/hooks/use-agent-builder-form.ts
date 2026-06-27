@@ -79,6 +79,9 @@ export function dbAgentToDraft(agent: DbAgent): AgentBuilderDraft {
       file_access: tools.file_access ?? false,
       calculator: tools.calculator ?? true,
     },
+    energy_limit_monthly:
+      agent.energy_limit_monthly ??
+      DEFAULT_AGENT_BUILDER_DRAFT.energy_limit_monthly,
   };
 }
 

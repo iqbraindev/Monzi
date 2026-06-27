@@ -52,6 +52,10 @@ export function parseCreateAgentBody(body: CreateAgentBody): AgentBuilderDraft {
       file_access: body.tools?.file_access ?? defaults.tools.file_access,
       calculator: body.tools?.calculator ?? defaults.tools.calculator,
     },
+    energy_limit_monthly:
+      typeof body.energy_limit_monthly === "number"
+        ? body.energy_limit_monthly
+        : defaults.energy_limit_monthly,
   };
 }
 
@@ -70,6 +74,7 @@ export function draftToDbRow(
     personality: draft.personality,
     voice: normalizeAgentVoice(draft.voice),
     tools: draft.tools,
+    energy_limit_monthly: draft.energy_limit_monthly,
     is_default: false,
   };
 }
@@ -113,6 +118,9 @@ export function draftToDbUpdate(
       ...((update.tools as object) ?? existing.tools ?? {}),
       composio_apps: draft.composio_apps,
     };
+  }
+  if (typeof draft.energy_limit_monthly === "number") {
+    update.energy_limit_monthly = draft.energy_limit_monthly;
   }
 
   return update;

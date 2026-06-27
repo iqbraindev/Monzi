@@ -150,7 +150,10 @@ async function provisionSupabaseUser(userId: string): Promise<void> {
     });
   }
 
-  await createWorkspaceForOwner(userId, "My Workspace", { isDefault: true });
+  await createWorkspaceForOwner(userId, "My Workspace", {
+    isDefault: true,
+    skipResourceBootstrap: true,
+  });
 }
 
 export { ensureDefaultWorkspace, createWorkspaceForOwner };

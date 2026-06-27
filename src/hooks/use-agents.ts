@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { DbAgent } from "@/lib/agents/adapter";
 import type { AgentBuilderDraft } from "@/lib/agents/form-types";
+import type { CreateAgentBody } from "@/lib/agents/api-body";
 import type { Agent } from "@/lib/aria/types";
 
 interface AgentsResponse {
@@ -72,11 +73,13 @@ export function useRemoveAgentFromCache() {
   };
 }
 
-export async function createAgent(input: AgentBuilderDraft): Promise<Agent> {
+export async function createAgent(
+  input: AgentBuilderDraft & { is_default?: boolean }
+): Promise<Agent> {
   const res = await fetch("/api/agents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify(input as CreateAgentBody),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

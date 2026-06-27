@@ -48,19 +48,19 @@ export interface DbAgent {
 }
 
 function toolkitsToGlyphs(toolkits: string[]): AppGlyph[] {
-  return toolkits
-    .map((slug) => {
-      const catalog = TOOLKIT_CATALOG[slug];
-      if (!catalog) return null;
-      return {
+  return toolkits.flatMap((slug) => {
+    const catalog = TOOLKIT_CATALOG[slug];
+    if (!catalog) return [];
+    return [
+      {
         glyph: catalog.glyph,
         color: catalog.bg,
         fg: catalog.fg,
         name: catalog.name,
         toolkitSlug: slug,
-      };
-    })
-    .filter((g): g is AppGlyph => g !== null);
+      },
+    ];
+  });
 }
 
 function formatLastActive(updatedAt: string): string {

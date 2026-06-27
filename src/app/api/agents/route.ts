@@ -138,9 +138,21 @@ export async function POST(req: Request) {
     planEnergy
   );
 
+  const { count: agentCount } = await supabase
+    .from("agents")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", ctx.workspaceId);
+
+  const isDefault =
+    body.is_default === true || (agentCount ?? 0) === 0;
+
   const { data: agent, error } = await supabase
     .from("agents")
-    .insert(draftToDbRow(draft, ctx.userId, ctx.workspaceId, slug))
+    .insert(
+      draftToDbRow(draft, ctx.userId, ctx.workspaceId, slug, {
+        isDefault,
+      })
+    )
     .select("*")
     .single();
 

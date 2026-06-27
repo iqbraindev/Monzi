@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import {
   AlertTriangle,
@@ -25,11 +25,20 @@ export function BillingView() {
   const searchParams = useSearchParams();
   const pastDue = searchParams.get("status") === "past_due";
   const success = searchParams.get("success") === "true";
+  const upgradeSlug = searchParams.get("upgrade");
 
   const { data, isLoading, error } = useBilling();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
   const portal = useBillingPortal();
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!upgradeSlug || isLoading || !data) return;
+    const valid = data.availablePacks.some((p) => p.slug === upgradeSlug);
+    if (valid && upgradeSlug !== data.pack.slug) {
+      setPickerOpen(true);
+    }
+  }, [upgradeSlug, isLoading, data]);
 
   if (isLoading) {
     return (

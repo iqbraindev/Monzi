@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Search, Users } from "lucide-react";
+import { Loader2, Search, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -10,6 +10,14 @@ import {
   adminButtonPrimary,
 } from "@/components/admin/admin-button-styles";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { AdminUserRow } from "@/lib/admin/types";
 import type { Pack } from "@/lib/billing/types";
@@ -38,6 +46,7 @@ export function UsersTable() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
+  const [userToDelete, setUserToDelete] = useState<AdminUserRow | null>(null);
 
   const { data: users = [], isLoading, error } = useQuery({
     queryKey: ["admin", "users", query],
@@ -76,12 +85,26 @@ export function UsersTable() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Delete failed");
+      return data as { success: boolean; email: string };
+    },
+    onSuccess: () => {
+      setUserToDelete(null);
+      void qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "stats"] });
+    },
+  });
+
   return (
     <div className="mx-auto w-full max-w-[1200px] px-7 pt-7 pb-12">
       <AdminPageHeader
         icon={Users}
         title="User management"
-        description="Search accounts, review plans, suspend access, or adjust subscriptions."
+        description="Search accounts, review plans, suspend access, adjust subscriptions, or permanently delete suspended users."
       />
 
       <form
@@ -115,7 +138,7 @@ export function UsersTable() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-aria-border bg-aria-surface/70">
-          <div className="grid grid-cols-[1.2fr_0.7fr_0.6fr_0.5fr_0.5fr_140px] gap-3 border-b border-aria-border bg-[#16161f] px-4 py-3 text-[11px] font-semibold tracking-wide text-aria-text-secondary uppercase">
+          <div className="grid grid-cols-[1.2fr_0.7fr_0.6fr_0.5fr_0.5fr_180px] gap-3 border-b border-aria-border bg-[#16161f] px-4 py-3 text-[11px] font-semibold tracking-wide text-aria-text-secondary uppercase">
             <span>User</span>
             <span>Plan</span>
             <span>Status</span>
@@ -131,7 +154,7 @@ export function UsersTable() {
             users.map((user) => (
               <div
                 key={user.id}
-                className="grid grid-cols-[1.2fr_0.7fr_0.6fr_0.5fr_0.5fr_140px] items-center gap-3 border-b border-[#16161f] px-4 py-3.5"
+                className="grid grid-cols-[1.2fr_0.7fr_0.6fr_0.5fr_0.5fr_180px] items-center gap-3 border-b border-[#16161f] px-4 py-3.5"
               >
                 <div>
                   <p className="text-sm font-medium text-aria-text">
@@ -174,7 +197,7 @@ export function UsersTable() {
                 <span className="font-mono text-sm text-aria-text">
                   {user.ai_messages_used}
                 </span>
-                <div>
+                <div className="flex flex-col gap-1.5">
                   <Button
                     size="sm"
                     variant={user.is_suspended ? "outline" : "destructive"}
@@ -182,7 +205,7 @@ export function UsersTable() {
                       "rounded-full",
                       user.is_suspended ? adminButtonOutline : undefined
                     )}
-                    disabled={updateMutation.isPending}
+                    disabled={updateMutation.isPending || deleteMutation.isPending}
                     onClick={() =>
                       updateMutation.mutate({
                         id: user.id,
@@ -192,12 +215,79 @@ export function UsersTable() {
                   >
                     {user.is_suspended ? "Restore" : "Suspend"}
                   </Button>
+                  {user.is_suspended ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="rounded-full"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => setUserToDelete(user)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Delete
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             ))
           )}
         </div>
       )}
+
+      <Dialog
+        open={userToDelete != null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setUserToDelete(null);
+        }}
+      >
+        <DialogContent className="border-aria-border bg-aria-surface text-aria-text">
+          <DialogHeader>
+            <DialogTitle>Permanently delete user?</DialogTitle>
+            <DialogDescription className="text-aria-text-secondary">
+              This will permanently delete{" "}
+              <span className="font-medium text-aria-text">
+                {userToDelete?.email}
+              </span>{" "}
+              and all related data — workspaces, agents, conversations,
+              dashboards, integrations, billing records, and subaccounts. This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteMutation.error ? (
+            <p className="text-sm text-destructive">
+              {deleteMutation.error instanceof Error
+                ? deleteMutation.error.message
+                : "Delete failed"}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className={adminButtonOutline}
+              disabled={deleteMutation.isPending}
+              onClick={() => setUserToDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (userToDelete) deleteMutation.mutate(userToDelete.id);
+              }}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete permanently"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

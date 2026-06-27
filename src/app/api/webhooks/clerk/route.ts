@@ -91,7 +91,10 @@ export async function POST(req: Request) {
           : {},
       });
 
-      await createWorkspaceForOwner(id, "My Workspace", { isDefault: true });
+      await createWorkspaceForOwner(id, "My Workspace", {
+        isDefault: true,
+        skipResourceBootstrap: true,
+      });
 
       break;
     }

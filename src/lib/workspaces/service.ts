@@ -148,6 +148,39 @@ export async function bootstrapWorkspaceResources(
   }
 }
 
+export async function ensureDefaultDashboard(
+  workspaceId: string,
+  userId: string
+): Promise<{ id: string; name: string }> {
+  const supabase = getSupabaseAdmin();
+
+  const { data: existing } = await supabase
+    .from("dashboards")
+    .select("id, name")
+    .eq("workspace_id", workspaceId)
+    .eq("is_default", true)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  const { data: dashboard, error } = await supabase
+    .from("dashboards")
+    .insert({
+      workspace_id: workspaceId,
+      user_id: userId,
+      name: "My Dashboard",
+      is_default: true,
+    })
+    .select("id, name")
+    .single();
+
+  if (error || !dashboard) {
+    throw new Error(error?.message ?? "Failed to create default dashboard");
+  }
+
+  return dashboard;
+}
+
 export async function createWorkspaceForOwner(
   ownerUserId: string,
   name: string,
@@ -155,6 +188,7 @@ export async function createWorkspaceForOwner(
     isDefault?: boolean;
     description?: string | null;
     activity_domain?: string | null;
+    skipResourceBootstrap?: boolean;
   }
 ): Promise<WorkspaceRow> {
   const supabase = getSupabaseAdmin();
@@ -194,11 +228,13 @@ export async function createWorkspaceForOwner(
         throw new Error(memberError.message);
       }
 
-      try {
-        await bootstrapWorkspaceResources(workspace.id, ownerUserId);
-      } catch (bootstrapError) {
-        await supabase.from("workspaces").delete().eq("id", workspace.id);
-        throw bootstrapError;
+      if (!options?.skipResourceBootstrap) {
+        try {
+          await bootstrapWorkspaceResources(workspace.id, ownerUserId);
+        } catch (bootstrapError) {
+          await supabase.from("workspaces").delete().eq("id", workspace.id);
+          throw bootstrapError;
+        }
       }
 
       return workspace as WorkspaceRow;
@@ -326,6 +362,7 @@ export async function ensureDefaultWorkspace(
 
   const workspace = await createWorkspaceForOwner(userId, "My Workspace", {
     isDefault: true,
+    skipResourceBootstrap: true,
   });
   return {
     ...workspace,

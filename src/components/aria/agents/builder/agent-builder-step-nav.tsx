@@ -17,17 +17,19 @@ const STEP_LABELS: Record<WizardStep, string> = {
 interface AgentBuilderStepNavProps {
   current: WizardStep;
   onStepClick?: (step: WizardStep) => void;
+  steps?: WizardStep[];
 }
 
 export function AgentBuilderStepNav({
   current,
   onStepClick,
+  steps = WIZARD_STEPS,
 }: AgentBuilderStepNavProps) {
-  const currentIdx = WIZARD_STEPS.indexOf(current);
+  const currentIdx = steps.indexOf(current);
 
   return (
     <nav className="mb-3 flex shrink-0 items-center gap-0 overflow-x-auto pb-0.5">
-      {WIZARD_STEPS.map((step, i) => {
+      {steps.map((step, i) => {
         const done = i < currentIdx;
         const active = step === current;
         return (
@@ -49,7 +51,7 @@ export function AgentBuilderStepNav({
             >
               {done ? "✓" : i + 1}
             </button>
-            {i < WIZARD_STEPS.length - 1 && (
+            {i < steps.length - 1 && (
               <span
                 className={cn(
                   "mx-1 h-0.5 w-6 shrink-0 rounded-full transition-colors",

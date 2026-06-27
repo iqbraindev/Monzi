@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     return Response.json({ error: "Logo not found" }, { status: 404 });
   }
 
-  return new Response(logo.buffer, {
+  return new Response(new Uint8Array(logo.buffer), {
     headers: {
       "Content-Type": logo.contentType,
       "Cache-Control": "private, max-age=3600",

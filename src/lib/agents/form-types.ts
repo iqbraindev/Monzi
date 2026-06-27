@@ -110,6 +110,13 @@ export const WIZARD_STEPS: WizardStep[] = [
   "review",
 ];
 
+/** Subset used during client onboarding (agent creation step). */
+export const ONBOARDING_AGENT_STEPS: WizardStep[] = [
+  "role",
+  "identity",
+  "apps",
+];
+
 export type StudioTab =
   | "role"
   | "identity"

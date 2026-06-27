@@ -10,7 +10,10 @@ export interface LegacyCreateAgentBody {
   color?: string;
 }
 
-export type CreateAgentBody = Partial<AgentBuilderDraft> & LegacyCreateAgentBody;
+export type CreateAgentBody = Partial<AgentBuilderDraft> &
+  LegacyCreateAgentBody & {
+    is_default?: boolean;
+  };
 
 export function parseCreateAgentBody(body: CreateAgentBody): AgentBuilderDraft {
   const defaults = DEFAULT_AGENT_BUILDER_DRAFT;
@@ -63,7 +66,8 @@ export function draftToDbRow(
   draft: AgentBuilderDraft,
   userId: string,
   workspaceId: string,
-  slug: string
+  slug: string,
+  options?: { isDefault?: boolean }
 ) {
   return {
     user_id: userId,
@@ -77,7 +81,7 @@ export function draftToDbRow(
     voice: normalizeAgentVoice(draft.voice),
     tools: draft.tools,
     energy_limit_monthly: draft.energy_limit_monthly,
-    is_default: false,
+    is_default: options?.isDefault ?? false,
   };
 }
 

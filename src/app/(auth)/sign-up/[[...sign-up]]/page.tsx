@@ -16,7 +16,7 @@ export default function SignUpPage() {
     >
       <SignUp
         appearance={signUpAppearance}
-        forceRedirectUrl="/dashboard"
+        forceRedirectUrl="/onboarding"
         signInForceRedirectUrl="/dashboard"
       />
     </AuthShell>

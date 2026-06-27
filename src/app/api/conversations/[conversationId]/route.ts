@@ -2,9 +2,10 @@ import { auth } from "@clerk/nextjs/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   try {
@@ -14,6 +15,7 @@ export async function DELETE(
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const { conversationId } = await params;
     const supabase = getSupabaseAdmin();
@@ -22,7 +24,7 @@ export async function DELETE(
       .from("conversations")
       .select("id, agent_id")
       .eq("id", conversationId)
-      .eq("user_id", userId)
+      .eq("workspace_id", ctx.workspaceId)
       .maybeSingle();
 
     if (!row) {
@@ -33,7 +35,7 @@ export async function DELETE(
       .from("conversations")
       .delete()
       .eq("id", conversationId)
-      .eq("user_id", userId);
+      .eq("workspace_id", ctx.workspaceId);
 
     if (error) throw error;
 

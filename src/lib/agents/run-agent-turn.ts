@@ -18,16 +18,20 @@ import {
 } from "@/lib/ai/openrouter";
 import { dbMessagesToUiMessages } from "@/lib/chat/message-mapper";
 import { getOrCreateConversation } from "@/lib/chat/conversation";
+import type { ComposioScopeOptions } from "@/lib/composio/scope";
 import { getLangChainTools, listActiveConnections } from "@/lib/composio/tools";
 import { TOOLKIT_CATALOG } from "@/lib/composio/toolkits";
 import { getDashboardTools } from "@/lib/dashboard/tools";
 import { listDashboardSummaries } from "@/lib/dashboard/service";
-import { incrementUserTokenUsage } from "@/lib/billing/energy";
+import { incrementWorkspaceTokenUsage } from "@/lib/billing/energy";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export interface AgentTurnContext {
   agent: DbAgent;
   conversationId: string;
+  userId: string;
+  workspaceId: string;
+  ownerUserId: string;
   composioApps: string[];
   aiTools: Record<string, ReturnType<typeof tool>>;
   system: string;
@@ -41,7 +45,7 @@ export interface AgentTurnResult {
 }
 
 export async function loadAgentForUser(
-  userId: string,
+  workspaceId: string,
   agentId: string
 ): Promise<DbAgent | null> {
   const supabase = getSupabaseAdmin();
@@ -49,7 +53,7 @@ export async function loadAgentForUser(
     .from("agents")
     .select("*")
     .eq("id", agentId)
-    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
     .single();
 
   return agentRow ? (agentRow as DbAgent) : null;
@@ -57,15 +61,21 @@ export async function loadAgentForUser(
 
 export async function prepareAgentTurn(params: {
   userId: string;
+  workspaceId: string;
+  ownerUserId: string;
+  composioScope: ComposioScopeOptions;
   agentId: string;
   conversationId?: string | null;
 }): Promise<AgentTurnContext | null> {
   const supabase = getSupabaseAdmin();
-  const agent = await loadAgentForUser(params.userId, params.agentId);
+  const agent = await loadAgentForUser(params.workspaceId, params.agentId);
   if (!agent) return null;
 
   const agentApps = agent.tools?.composio_apps ?? [];
-  const connections = await listActiveConnections(params.userId);
+  const connections = await listActiveConnections(
+    params.workspaceId,
+    params.composioScope
+  );
   const connectedApps = connections
     .map((c) => c.toolkit?.slug)
     .filter((slug): slug is string => Boolean(slug));
@@ -74,13 +84,18 @@ export async function prepareAgentTurn(params: {
   const conversationId = await getOrCreateConversation(
     supabase,
     params.userId,
+    params.workspaceId,
     params.agentId,
     params.conversationId
   );
 
   if (!conversationId) return null;
 
-  const lcTools = await getLangChainTools(params.userId, composioApps);
+  const lcTools = await getLangChainTools(
+    params.workspaceId,
+    composioApps,
+    params.composioScope
+  );
   const composioAiTools = Object.fromEntries(
     lcTools.map((t) => [
       t.name,
@@ -92,11 +107,16 @@ export async function prepareAgentTurn(params: {
     ])
   );
 
-  const dashboardSummaries = await listDashboardSummaries(supabase, params.userId);
+  const dashboardSummaries = await listDashboardSummaries(
+    supabase,
+    params.workspaceId
+  );
   const dashboardTools =
     agent.tools?.dashboard_control !== false
       ? getDashboardTools({
           userId: params.userId,
+          workspaceId: params.workspaceId,
+          composioScope: params.composioScope,
           agentId: params.agentId,
           conversationId,
         })
@@ -115,6 +135,9 @@ export async function prepareAgentTurn(params: {
   return {
     agent,
     conversationId,
+    userId: params.userId,
+    workspaceId: params.workspaceId,
+    ownerUserId: params.ownerUserId,
     composioApps,
     aiTools: { ...composioAiTools, ...dashboardTools },
     system,
@@ -226,14 +249,11 @@ export async function streamAgentTurn(
         tokens
       );
       if (tokens > 0) {
-        const { data: convo } = await ctx.supabase
-          .from("conversations")
-          .select("user_id")
-          .eq("id", ctx.conversationId)
-          .single();
-        if (convo?.user_id) {
-          await incrementUserTokenUsage(convo.user_id, tokens);
-        }
+        await incrementWorkspaceTokenUsage(
+          ctx.workspaceId,
+          ctx.ownerUserId,
+          tokens
+        );
       }
     },
   });
@@ -264,14 +284,11 @@ export async function executeAgentTurn(
   const tokens =
     result.totalUsage?.totalTokens ?? result.usage?.totalTokens ?? 0;
   if (tokens > 0) {
-    const { data: convo } = await ctx.supabase
-      .from("conversations")
-      .select("user_id")
-      .eq("id", ctx.conversationId)
-      .single();
-    if (convo?.user_id) {
-      await incrementUserTokenUsage(convo.user_id, tokens);
-    }
+    await incrementWorkspaceTokenUsage(
+      ctx.workspaceId,
+      ctx.ownerUserId,
+      tokens
+    );
   }
 
   return {

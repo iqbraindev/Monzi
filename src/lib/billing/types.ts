@@ -9,6 +9,7 @@ export type SubscriptionStatus =
   | "incomplete";
 
 export interface PackLimits {
+  max_workspaces: number;
   max_agents: number;
   max_subaccounts: number;
   ai_messages_per_month: number;

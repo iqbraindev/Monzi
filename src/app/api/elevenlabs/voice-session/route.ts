@@ -9,9 +9,12 @@ import {
 import { getOrCreateConversation } from "@/lib/chat/conversation";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { getComposioScope } from "@/lib/composio/scope";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 import {
   buildVoiceOverrides,
   getElevenLabsAgentId,
+  getElevenLabsCustomLlmSecret,
   getElevenLabsSignedUrl,
 } from "@/lib/voice/elevenlabs";
 import {
@@ -29,8 +32,9 @@ export async function POST(req: Request) {
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
-    const voiceAllowed = await getUserVoiceEnabled(userId);
+    const voiceAllowed = await getUserVoiceEnabled(ctx.ownerUserId);
     if (!voiceAllowed) {
       return Response.json(
         { error: "Voice mode requires a Starter plan or higher." },
@@ -48,7 +52,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "agentId is required" }, { status: 400 });
     }
 
-    const elevenLabsAgentId = getElevenLabsAgentId();
+    const elevenLabsAgentId = await getElevenLabsAgentId();
     if (!elevenLabsAgentId) {
       return Response.json(
         {
@@ -59,7 +63,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const agent = await loadAgentForUser(userId, agentId);
+    const agent = await loadAgentForUser(ctx.workspaceId, agentId);
     if (!agent) {
       return Response.json({ error: "Agent not found" }, { status: 404 });
     }
@@ -67,7 +71,8 @@ export async function POST(req: Request) {
     const supabase = getSupabaseAdmin();
     const conversationId = await getOrCreateConversation(
       supabase,
-      userId,
+      ctx.userId,
+      ctx.workspaceId,
       agentId,
       requestedConversationId
     );
@@ -80,9 +85,9 @@ export async function POST(req: Request) {
     }
 
     const signedUrl = await getElevenLabsSignedUrl(elevenLabsAgentId);
-    const overrides = buildVoiceOverrides(agent);
+    const overrides = await buildVoiceOverrides(agent);
 
-    const llmSecret = process.env.ELEVENLABS_CUSTOM_LLM_SECRET;
+    const llmSecret = await getElevenLabsCustomLlmSecret();
     if (!llmSecret) {
       return Response.json(
         {
@@ -94,19 +99,26 @@ export async function POST(req: Request) {
     }
 
     const voiceToken = createVoiceSessionToken(llmSecret, {
-      userId,
+      userId: ctx.userId,
       agentId,
       conversationId,
     });
 
-    registerVoiceSession({ userId, agentId, conversationId });
+    registerVoiceSession({ userId: ctx.userId, agentId, conversationId });
     resetVoiceIntro(conversationId);
 
     // Pre-warm agent + Composio tools so the custom LLM responds within ElevenLabs' timeout.
-    const ctx = await prepareAgentTurn({ userId, agentId, conversationId });
-    if (ctx) {
-      ctx.system = appendVoiceConversationGuidance(ctx.system);
-      cacheVoiceContext(conversationId, ctx);
+    const turnCtx = await prepareAgentTurn({
+      userId: ctx.userId,
+      workspaceId: ctx.workspaceId,
+      ownerUserId: ctx.ownerUserId,
+      composioScope: getComposioScope(ctx),
+      agentId,
+      conversationId,
+    });
+    if (turnCtx) {
+      turnCtx.system = appendVoiceConversationGuidance(turnCtx.system);
+      cacheVoiceContext(conversationId, turnCtx);
     }
 
     return Response.json({
@@ -115,7 +127,7 @@ export async function POST(req: Request) {
       overrides,
       agentName: agent.name,
       voiceToken,
-      userId,
+      userId: ctx.userId,
     });
   } catch (err) {
     const message =

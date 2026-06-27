@@ -1,10 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 
+import { canCreateDashboard } from "@/lib/billing/limit-enforcer";
 import { createDashboard, listDashboards } from "@/lib/dashboard/service";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -12,9 +14,10 @@ export async function GET() {
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const supabase = getSupabaseAdmin();
-    const dashboards = await listDashboards(supabase, userId);
+    const dashboards = await listDashboards(supabase, ctx.workspaceId);
 
     return Response.json({ dashboards });
   } catch (err) {
@@ -33,6 +36,7 @@ export async function POST(req: Request) {
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const body = (await req.json()) as {
       name?: string;
@@ -45,9 +49,18 @@ export async function POST(req: Request) {
       return Response.json({ error: "name is required" }, { status: 400 });
     }
 
+    const dashboardCheck = await canCreateDashboard(
+      ctx.workspaceId,
+      ctx.ownerUserId
+    );
+    if (!dashboardCheck.ok) {
+      return Response.json(dashboardCheck.error, { status: 403 });
+    }
+
     const supabase = getSupabaseAdmin();
     const dashboard = await createDashboard(supabase, {
-      userId,
+      userId: ctx.userId,
+      workspaceId: ctx.workspaceId,
       name,
       icon: body.icon,
       description: body.description,

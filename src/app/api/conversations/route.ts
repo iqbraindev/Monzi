@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createConversation } from "@/lib/chat/conversation";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function GET(req: Request) {
   try {
@@ -12,6 +13,7 @@ export async function GET(req: Request) {
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const agentId = new URL(req.url).searchParams.get("agentId");
     if (!agentId) {
@@ -24,7 +26,7 @@ export async function GET(req: Request) {
       .from("agents")
       .select("id")
       .eq("id", agentId)
-      .eq("user_id", userId)
+      .eq("workspace_id", ctx.workspaceId)
       .maybeSingle();
 
     if (!agentRow) {
@@ -35,7 +37,7 @@ export async function GET(req: Request) {
       .from("conversations")
       .select("id, title, updated_at, created_at")
       .eq("agent_id", agentId)
-      .eq("user_id", userId)
+      .eq("workspace_id", ctx.workspaceId)
       .order("updated_at", { ascending: false });
 
     if (error) throw error;
@@ -82,6 +84,7 @@ export async function POST(req: Request) {
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const body = (await req.json()) as { agentId?: string; title?: string };
     if (!body.agentId) {
@@ -94,7 +97,7 @@ export async function POST(req: Request) {
       .from("agents")
       .select("id")
       .eq("id", body.agentId)
-      .eq("user_id", userId)
+      .eq("workspace_id", ctx.workspaceId)
       .maybeSingle();
 
     if (!agentRow) {
@@ -103,7 +106,8 @@ export async function POST(req: Request) {
 
     const conversationId = await createConversation(
       supabase,
-      userId,
+      ctx.userId,
+      ctx.workspaceId,
       body.agentId,
       body.title ?? "New chat"
     );

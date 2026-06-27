@@ -3,9 +3,10 @@ import { auth } from "@clerk/nextjs/server";
 import { loadAgentForUser } from "@/lib/agents/run-agent-turn";
 import { getAgentEnergyStats } from "@/lib/billing/energy";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -15,14 +16,19 @@ export async function GET(
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const { id } = await params;
-    const agent = await loadAgentForUser(userId, id);
+    const agent = await loadAgentForUser(ctx.workspaceId, id);
     if (!agent) {
       return Response.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    const stats = await getAgentEnergyStats(userId, agent);
+    const stats = await getAgentEnergyStats(
+      ctx.ownerUserId,
+      ctx.workspaceId,
+      agent
+    );
     return Response.json(stats);
   } catch (err) {
     const message =

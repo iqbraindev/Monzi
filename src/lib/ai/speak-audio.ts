@@ -1,5 +1,6 @@
 import {
   getOpenRouterApiKey,
+  getOpenRouterModels,
   getOpenRouterRequestHeaders,
 } from "@/lib/ai/openrouter";
 
@@ -18,13 +19,13 @@ export async function synthesizeSpeech(
   _voice = "nova",
   speed = 1
 ): Promise<ArrayBuffer> {
-  const model =
-    process.env.OPENROUTER_TTS_MODEL ?? DEFAULT_OPENROUTER_TTS_MODEL;
+  const models = await getOpenRouterModels();
+  const model = models.tts ?? DEFAULT_OPENROUTER_TTS_MODEL;
   const voice = "nova";
   const res = await fetch(`${OPENROUTER_BASE_URL}/audio/speech`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${getOpenRouterApiKey()}`,
+      Authorization: `Bearer ${await getOpenRouterApiKey()}`,
       "Content-Type": "application/json",
       ...getOpenRouterRequestHeaders(),
     },

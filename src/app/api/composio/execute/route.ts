@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { auth } from "@clerk/nextjs/server";
 
 import { getWidgetToolConfig } from "@/lib/composio/tool-map";
+import { getComposioScope } from "@/lib/composio/scope";
 import { executeTool, listActiveConnections } from "@/lib/composio/tools";
 import {
   adaptCalendarEvents,
@@ -13,12 +14,16 @@ import {
 } from "@/lib/composio/widget-adapters";
 import { getRedisOptional } from "@/lib/redis/optional";
 import type { DashboardWidgetId } from "@/lib/aria/types";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const ctx = await resolveWorkspaceContext(userId, { request: req });
+  const composioScope = getComposioScope(ctx);
 
   const body = (await req.json()) as {
     tool?: string;
@@ -43,7 +48,10 @@ export async function POST(req: Request) {
   }
 
   if (toolkit) {
-    const connections = await listActiveConnections(userId);
+    const connections = await listActiveConnections(
+      ctx.workspaceId,
+      composioScope
+    );
     const connected = connections.some((c) => c.toolkit?.slug === toolkit);
     if (!connected) {
       return Response.json(
@@ -54,7 +62,7 @@ export async function POST(req: Request) {
   }
 
   const cacheTtl = body.cacheTtl ?? widgetConfig?.cacheTtlSec ?? 120;
-  const cacheKey = `widget:${userId}:${tool}:${hashParams(params)}`;
+  const cacheKey = `widget:${ctx.workspaceId}:${tool}:${hashParams(params)}`;
   const redis = getRedisOptional();
 
   if (redis) {
@@ -65,7 +73,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await executeTool(userId, tool, params);
+    const result = await executeTool(
+      ctx.workspaceId,
+      tool,
+      params,
+      undefined,
+      composioScope
+    );
     const raw = unwrapComposioResult(result);
     const payload = {
       tool,

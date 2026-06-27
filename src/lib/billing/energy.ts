@@ -90,7 +90,7 @@ export function clampEnergyLimitForPlan(
 }
 
 export async function getAgentEnergyUsage(
-  userId: string,
+  workspaceId: string,
   agentId: string
 ): Promise<number> {
   const supabase = getSupabaseAdmin();
@@ -99,7 +99,7 @@ export async function getAgentEnergyUsage(
   const { data: conversations } = await supabase
     .from("conversations")
     .select("id")
-    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
     .eq("agent_id", agentId);
 
   const ids = (conversations ?? []).map((c) => c.id);
@@ -118,12 +118,13 @@ export async function getAgentEnergyUsage(
 }
 
 export async function getAgentEnergyStats(
-  userId: string,
+  ownerUserId: string,
+  workspaceId: string,
   agent: DbAgent
 ): Promise<AgentEnergyStats> {
-  const plan = await getPlanEnergyLimits(userId);
+  const plan = await getPlanEnergyLimits(ownerUserId);
   const limit = resolveAgentEnergyLimit(agent, plan);
-  const used = await getAgentEnergyUsage(userId, agent.id);
+  const used = await getAgentEnergyUsage(workspaceId, agent.id);
   const { start, end } = monthPeriod();
   const unlimited = limit < 0;
 
@@ -138,10 +139,11 @@ export async function getAgentEnergyStats(
 }
 
 export async function assertAgentHasEnergy(
-  userId: string,
+  ownerUserId: string,
+  workspaceId: string,
   agent: DbAgent
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const stats = await getAgentEnergyStats(userId, agent);
+  const stats = await getAgentEnergyStats(ownerUserId, workspaceId, agent);
   if (stats.unlimited) return { ok: true };
   if (stats.used >= stats.limit) {
     return {
@@ -153,8 +155,9 @@ export async function assertAgentHasEnergy(
   return { ok: true };
 }
 
-export async function incrementUserTokenUsage(
-  userId: string,
+export async function incrementWorkspaceTokenUsage(
+  workspaceId: string,
+  ownerUserId: string,
   tokens: number
 ): Promise<void> {
   if (tokens <= 0) return;
@@ -165,7 +168,7 @@ export async function incrementUserTokenUsage(
   const { data: existing } = await supabase
     .from("usage_tracking")
     .select("id, ai_tokens_used")
-    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
     .eq("period_start", start)
     .maybeSingle();
 
@@ -178,7 +181,8 @@ export async function incrementUserTokenUsage(
       .eq("id", existing.id);
   } else {
     await supabase.from("usage_tracking").insert({
-      user_id: userId,
+      user_id: ownerUserId,
+      workspace_id: workspaceId,
       period_start: start,
       period_end: end,
       ai_tokens_used: tokens,

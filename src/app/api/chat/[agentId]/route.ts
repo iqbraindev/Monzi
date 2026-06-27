@@ -10,6 +10,8 @@ import { assertAgentHasEnergy } from "@/lib/billing/energy";
 import { formatAiErrorMessage } from "@/lib/ai/user-facing-errors";
 import { getRedisOptional } from "@/lib/redis/optional";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { getComposioScope } from "@/lib/composio/scope";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export const maxDuration = 60;
 
@@ -24,6 +26,7 @@ export async function POST(
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const { agentId } = await params;
     const {
@@ -33,7 +36,7 @@ export async function POST(
 
     const redis = getRedisOptional();
     if (redis) {
-      const key = `chat:rate:${userId}:${new Date().toISOString().slice(0, 10)}`;
+      const key = `chat:rate:${ctx.workspaceId}:${new Date().toISOString().slice(0, 10)}`;
       const count = await redis.incr(key);
       if (count === 1) await redis.expire(key, 86400);
       if (count > 200) {
@@ -44,17 +47,24 @@ export async function POST(
       }
     }
 
-    const ctx = await prepareAgentTurn({
-      userId,
+    const turnCtx = await prepareAgentTurn({
+      userId: ctx.userId,
+      workspaceId: ctx.workspaceId,
+      ownerUserId: ctx.ownerUserId,
+      composioScope: getComposioScope(ctx),
       agentId,
       conversationId: requestedConversationId,
     });
 
-    if (!ctx) {
+    if (!turnCtx) {
       return Response.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    const energyCheck = await assertAgentHasEnergy(userId, ctx.agent);
+    const energyCheck = await assertAgentHasEnergy(
+      ctx.ownerUserId,
+      ctx.workspaceId,
+      turnCtx.agent
+    );
     if (!energyCheck.ok) {
       return Response.json({ error: energyCheck.message }, { status: 402 });
     }
@@ -67,10 +77,10 @@ export async function POST(
           .map((p) => p.text)
           .join("") ?? "";
 
-      await persistUserMessage(ctx, text);
+      await persistUserMessage(turnCtx, text);
     }
 
-    const result = await streamAgentTurn(ctx, messages);
+    const result = await streamAgentTurn(turnCtx, messages);
     return result.toUIMessageStreamResponse({
       onError: formatAiErrorMessage,
     });

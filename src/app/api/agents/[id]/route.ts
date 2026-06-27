@@ -13,11 +13,13 @@ import {
 import {
   getConnectedToolkitSlugs,
 } from "@/lib/composio/agent-toolkits";
+import { getComposioScope } from "@/lib/composio/scope";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { userId } = await auth();
@@ -25,6 +27,8 @@ export async function GET(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const ctx = await resolveWorkspaceContext(userId, { request: req });
+  const composioScope = getComposioScope(ctx);
   const { id } = await params;
   const supabase = getSupabaseAdmin();
 
@@ -32,17 +36,18 @@ export async function GET(
     .from("agents")
     .select("*")
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("workspace_id", ctx.workspaceId)
     .single();
 
   if (error || !agent) {
     return Response.json({ error: "Agent not found" }, { status: 404 });
   }
 
-  const connectedToolkits = await getConnectedToolkitSlugs(userId).catch(
-    () => [] as string[]
-  );
-  const voiceAllowed = await getUserVoiceEnabled(userId);
+  const connectedToolkits = await getConnectedToolkitSlugs(
+    ctx.workspaceId,
+    composioScope
+  ).catch(() => [] as string[]);
+  const voiceAllowed = await getUserVoiceEnabled(ctx.ownerUserId);
 
   return Response.json({
     agent: dbAgentToUiAgent(agent as DbAgent, 0, connectedToolkits, voiceAllowed),
@@ -59,6 +64,8 @@ export async function PATCH(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const ctx = await resolveWorkspaceContext(userId, { request: req });
+  const composioScope = getComposioScope(ctx);
   const { id } = await params;
   const body = (await req.json()) as PatchAgentBody;
 
@@ -67,21 +74,22 @@ export async function PATCH(
     .from("agents")
     .select("*")
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("workspace_id", ctx.workspaceId)
     .single();
 
   if (!existing) {
     return Response.json({ error: "Agent not found" }, { status: 404 });
   }
 
-  const voiceAllowed = await getUserVoiceEnabled(userId);
+  const voiceAllowed = await getUserVoiceEnabled(ctx.ownerUserId);
   if (!voiceAllowed && body.voice) {
     body.voice = { ...body.voice, enabled: false };
   }
 
-  const connectedToolkits = await getConnectedToolkitSlugs(userId).catch(
-    () => [] as string[]
-  );
+  const connectedToolkits = await getConnectedToolkitSlugs(
+    ctx.workspaceId,
+    composioScope
+  ).catch(() => [] as string[]);
 
   if (body.tools?.composio_apps) {
     body.tools.composio_apps = filterComposioAppsForConnected(
@@ -97,7 +105,7 @@ export async function PATCH(
   }
 
   if (typeof body.energy_limit_monthly === "number") {
-    const planEnergy = await getPlanEnergyLimits(userId);
+    const planEnergy = await getPlanEnergyLimits(ctx.ownerUserId);
     body.energy_limit_monthly = clampEnergyLimitForPlan(
       body.energy_limit_monthly,
       planEnergy
@@ -115,7 +123,7 @@ export async function PATCH(
     .from("agents")
     .update(update)
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("workspace_id", ctx.workspaceId)
     .select("*")
     .single();
 
@@ -135,7 +143,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { userId } = await auth();
@@ -143,6 +151,8 @@ export async function DELETE(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const ctx = await resolveWorkspaceContext(userId, { request: req });
+  const composioScope = getComposioScope(ctx);
   const { id } = await params;
   const supabase = getSupabaseAdmin();
 
@@ -150,7 +160,7 @@ export async function DELETE(
     .from("agents")
     .select("id, is_default")
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("workspace_id", ctx.workspaceId)
     .single();
 
   if (!existing) {
@@ -168,7 +178,7 @@ export async function DELETE(
     .from("agents")
     .delete()
     .eq("id", id)
-    .eq("user_id", userId);
+    .eq("workspace_id", ctx.workspaceId);
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });

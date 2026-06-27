@@ -128,6 +128,11 @@ SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
 NEXT_PUBLIC_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
 
 # ─────────────────────────────────────────
+# PLATFORM SECRETS (Admin integrations UI)
+# ─────────────────────────────────────────
+PLATFORM_SECRETS_ENCRYPTION_KEY=your-32-byte-hex-or-base64-key
+
+# ─────────────────────────────────────────
 # SUPER ADMIN
 # ─────────────────────────────────────────
 SUPER_ADMIN_EMAIL=admin@aria.app          # Used to auto-assign role on signup

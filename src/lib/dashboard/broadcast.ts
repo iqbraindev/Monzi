@@ -67,22 +67,22 @@ async function tryBroadcast(
 }
 
 export async function broadcastWidgetCreated(
-  userId: string,
+  workspaceId: string,
   dashboardId: string,
   widget: import("@/lib/dashboard/types").DbWidget
 ): Promise<void> {
   const payload = { widget, dashboardId };
-  await tryBroadcast(`user:${userId}`, "widget:created", payload);
+  await tryBroadcast(`workspace:${workspaceId}`, "widget:created", payload);
   await tryBroadcast(`dashboard:${dashboardId}`, "widget:created", payload);
 }
 
 export async function broadcastDashboardCreated(
-  userId: string,
+  workspaceId: string,
   dashboard: import("@/lib/dashboard/types").DbDashboard,
   widgets: import("@/lib/dashboard/types").DbWidget[],
   autoSwitch = true
 ): Promise<void> {
-  await tryBroadcast(`user:${userId}`, "dashboard:created", {
+  await tryBroadcast(`workspace:${workspaceId}`, "dashboard:created", {
     dashboard,
     widgets,
     autoSwitch,

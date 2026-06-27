@@ -1,4 +1,8 @@
+"use client";
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { useLimits } from "@/hooks/use-workspaces";
 
 export interface ComposioConnection {
   id: string;
@@ -18,16 +22,26 @@ async function fetchConnections(): Promise<ComposioConnection[]> {
 }
 
 export function useComposioConnections() {
+  const { data: limitsData } = useLimits();
+  const workspaceId = limitsData?.workspaceId as string | undefined;
+
   return useQuery({
-    queryKey: ["composio-connections"],
+    queryKey: ["composio-connections", workspaceId],
     queryFn: fetchConnections,
+    enabled: Boolean(workspaceId),
     staleTime: 30_000,
   });
 }
 
 export function useInvalidateComposioConnections() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ["composio-connections"] });
+  const { data: limitsData } = useLimits();
+  const workspaceId = limitsData?.workspaceId as string | undefined;
+
+  return () =>
+    qc.invalidateQueries({
+      queryKey: ["composio-connections", workspaceId],
+    });
 }
 
 export function useConnectedToolkits() {

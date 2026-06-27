@@ -1,15 +1,20 @@
 import type { DbAgent } from "@/lib/agents/adapter";
+import { getPlatformSecret, getPlatformSetting } from "@/lib/platform/config";
 import { clampElevenLabsSpeed } from "@/lib/voice/sanitize-speech";
 import { normalizeAgentVoiceId } from "@/lib/voice/voice-options";
 
 const ELEVENLABS_API = "https://api.elevenlabs.io";
 
-export function getElevenLabsAgentId(): string | null {
-  return process.env.ELEVENLABS_AGENT_ID ?? null;
+export async function getElevenLabsAgentId(): Promise<string | null> {
+  return (await getPlatformSetting("elevenlabs.agent_id")) ?? null;
 }
 
-export function isElevenLabsVoiceConfigured(): boolean {
-  return Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_AGENT_ID);
+export async function isElevenLabsVoiceConfigured(): Promise<boolean> {
+  const [apiKey, agentId] = await Promise.all([
+    getPlatformSecret("elevenlabs.api_key"),
+    getPlatformSetting("elevenlabs.agent_id"),
+  ]);
+  return Boolean(apiKey && agentId);
 }
 
 /**
@@ -18,7 +23,7 @@ export function isElevenLabsVoiceConfigured(): boolean {
  * ever seeing the API key.
  */
 export async function getElevenLabsSignedUrl(agentId: string): Promise<string> {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+  const apiKey = await getPlatformSecret("elevenlabs.api_key");
   if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not configured.");
 
   const res = await fetch(
@@ -49,10 +54,6 @@ export interface VoiceOverrides {
   tts?: { voiceId: string; speed?: number };
 }
 
-/**
- * Minimal per-call prompt override for ElevenLabs UI. The real system prompt
- * (with Composio tools, dashboard control, etc.) is served by our custom LLM.
- */
 function buildVoicePrompt(agent: DbAgent): string {
   return `You are ${agent.name}, a voice assistant for Monzi.`;
 }
@@ -61,25 +62,20 @@ export function buildVoiceGreeting(agent: DbAgent): string {
   return `Hey! I'm ${agent.name}. Need me to help with anything?`;
 }
 
-/**
- * ElevenLabs voice ids are ~20-char opaque strings (e.g. "cjVigY5qzO86Huf0OWal"),
- * not human names like legacy OpenAI presets stored on some agents.
- */
 function isElevenLabsVoiceId(value: string | undefined): value is string {
   return Boolean(value && /^[A-Za-z0-9]{16,}$/.test(value));
 }
 
-/** Resolves the voice id for a call: per-agent ElevenLabs voice → env default. */
-export function resolveVoiceId(agent: DbAgent): string | undefined {
+export async function resolveVoiceId(agent: DbAgent): Promise<string | undefined> {
   const normalized = normalizeAgentVoiceId(agent.voice?.voice_id);
   if (agent.voice?.provider === "elevenlabs" || isElevenLabsVoiceId(normalized)) {
     return normalized;
   }
-  const envDefault = process.env.ELEVENLABS_DEFAULT_VOICE_ID;
-  return isElevenLabsVoiceId(envDefault) ? envDefault : normalized;
+  const envDefault = await getPlatformSetting("elevenlabs.default_voice_id");
+  return isElevenLabsVoiceId(envDefault ?? undefined) ? envDefault! : normalized;
 }
 
-export function buildVoiceOverrides(agent: DbAgent): VoiceOverrides {
+export async function buildVoiceOverrides(agent: DbAgent): Promise<VoiceOverrides> {
   const language = agent.personality?.language?.trim() || "en";
 
   const overrides: VoiceOverrides = {
@@ -90,11 +86,15 @@ export function buildVoiceOverrides(agent: DbAgent): VoiceOverrides {
     },
   };
 
-  const voiceId = resolveVoiceId(agent);
+  const voiceId = await resolveVoiceId(agent);
   const speed = clampElevenLabsSpeed(agent.voice?.speed ?? 1);
   if (voiceId) {
     overrides.tts = { voiceId, speed };
   }
 
   return overrides;
+}
+
+export async function getElevenLabsCustomLlmSecret(): Promise<string | null> {
+  return getPlatformSecret("elevenlabs.custom_llm_secret");
 }

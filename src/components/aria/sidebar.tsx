@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 import {
   LayoutDashboard,
   Bot,
@@ -10,10 +9,12 @@ import {
   Users,
   CreditCard,
   Settings,
-  Shield,
   type LucideIcon,
 } from "lucide-react";
 
+import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
+import { useLimits } from "@/hooks/use-workspaces";
+import { useBilling } from "@/hooks/use-billing";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/store/ui-store";
 import { getAgent } from "@/lib/aria/mock-data";
@@ -64,43 +65,56 @@ function NavLink({
   );
 }
 
+function SidebarUsageMeter({ expanded }: { expanded: boolean }) {
+  const { data: limitsData } = useLimits();
+  const { data: billing } = useBilling();
+
+  if (!expanded) return null;
+
+  const planName = billing?.pack?.name ?? "Free";
+  const used = limitsData?.usage?.ai_messages_used ?? 0;
+  const max = limitsData?.limits?.ai_messages_per_month ?? 50;
+  const unlimited = max < 0;
+  const percent = unlimited || max === 0 ? 0 : Math.min(100, (used / max) * 100);
+
+  return (
+    <div className="mt-2 flex flex-col gap-2 p-2.5">
+      <div className="flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-aria-primary/30 bg-aria-primary/15 px-2.5 py-0.5 text-xs font-semibold text-aria-primary-light">
+          {planName} Plan
+        </span>
+        <span className="font-mono text-[11px] text-aria-text-secondary">
+          {unlimited
+            ? `${used.toLocaleString()} msgs`
+            : `${used.toLocaleString()} / ${max.toLocaleString()}`}
+        </span>
+      </div>
+      {!unlimited && (
+        <div className="h-[5px] overflow-hidden rounded-full bg-aria-subtle">
+          <div
+            className="aria-gradient h-full rounded-full transition-all"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
-  const { user } = useUser();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const activeAgentId = useUIStore((s) => s.activeAgentId);
   const expanded = !collapsed;
   const agent = getAgent(activeAgentId ?? "nova");
-  const isSuperAdmin = user?.publicMetadata?.role === "super_admin";
 
   return (
     <aside
       className="flex shrink-0 flex-col overflow-hidden border-r border-aria-border-subtle bg-aria-surface transition-[width] duration-200 ease-out"
       style={{ width: collapsed ? 68 : 240 }}
     >
-      {/* Workspace header */}
-      <div className="flex min-h-[54px] items-center gap-2.5 px-3.5 pt-4 pb-2.5">
-        <span
-          className="flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
-          style={{
-            background: "linear-gradient(135deg, #6366F1, #06B6D4)",
-          }}
-        >
-          DK
-        </span>
-        {expanded && (
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate text-[13px] font-semibold text-aria-text">
-              My Workspace
-            </span>
-            <span className="truncate text-[11px] text-aria-text-secondary">
-              Dana Kessler
-            </span>
-          </span>
-        )}
-      </div>
+      <WorkspaceSwitcher expanded={expanded} />
 
-      {/* Navigation */}
       <nav className="flex flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto p-2">
         {NAV_MAIN.map((item) => (
           <NavLink
@@ -124,24 +138,8 @@ export function Sidebar() {
             active={pathname === item.href || pathname.startsWith(item.href + "/")}
           />
         ))}
-
-        {isSuperAdmin && (
-          <>
-            {expanded && (
-              <div className="px-3 pt-3.5 pb-1.5 text-[11px] font-semibold tracking-[0.08em] text-aria-text-muted uppercase">
-                Admin
-              </div>
-            )}
-            <NavLink
-              item={{ label: "Packages", href: "/admin/packs", icon: Shield }}
-              expanded={expanded}
-              active={pathname.startsWith("/admin")}
-            />
-          </>
-        )}
       </nav>
 
-      {/* Active agent + plan */}
       <div className="border-t border-aria-border-subtle p-2">
         {expanded && (
           <div className="flex flex-col gap-2.5 rounded-xl border border-aria-border bg-aria-elevated p-2.5">
@@ -169,21 +167,7 @@ export function Sidebar() {
           </div>
         )}
 
-        {expanded && (
-          <div className="mt-2 flex flex-col gap-2 p-2.5">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-aria-primary/30 bg-aria-primary/15 px-2.5 py-0.5 text-xs font-semibold text-aria-primary-light">
-                Pro Plan
-              </span>
-              <span className="font-mono text-[11px] text-aria-text-secondary">
-                1,200 / 2,000
-              </span>
-            </div>
-            <div className="h-[5px] overflow-hidden rounded-full bg-aria-subtle">
-              <div className="aria-gradient h-full w-[60%] rounded-full" />
-            </div>
-          </div>
-        )}
+        <SidebarUsageMeter expanded={expanded} />
       </div>
     </aside>
   );

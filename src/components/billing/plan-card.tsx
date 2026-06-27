@@ -33,6 +33,7 @@ export function PlanCard({
       ? Math.round(Number(price) / 12)
       : null;
   const features = getPackFeatures(pack.limits ?? {
+    max_workspaces: 1,
     max_agents: 1,
     max_subaccounts: 0,
     ai_messages_per_month: 50,

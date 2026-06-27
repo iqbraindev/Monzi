@@ -1,8 +1,11 @@
 import { clerkClient, WebhookEvent } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import { Webhook } from "svix";
+
+import { getPlatformSecret } from "@/lib/platform/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { getStripe } from "@/lib/stripe/client";
+import { getStripe, isStripeConfigured } from "@/lib/stripe/client";
+import { createWorkspaceForOwner } from "@/lib/workspaces/service";
 
 export async function POST(req: Request) {
   const payload = await req.text();
@@ -13,7 +16,12 @@ export async function POST(req: Request) {
     "svix-signature": headerPayload.get("svix-signature")!,
   };
 
-  const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET!);
+  const webhookSecret = await getPlatformSecret("clerk.webhook_secret");
+  if (!webhookSecret) {
+    return Response.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+
+  const wh = new Webhook(webhookSecret);
   let event: WebhookEvent;
 
   try {
@@ -31,7 +39,9 @@ export async function POST(req: Request) {
         return Response.json({ error: "No email found" }, { status: 400 });
       }
 
-      const isSuperAdmin = email === process.env.SUPER_ADMIN_EMAIL;
+      const isSuperAdmin =
+        email.trim().toLowerCase() ===
+        process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
       const role = isSuperAdmin ? "super_admin" : "user";
 
       const supabase = getSupabaseAdmin();
@@ -45,8 +55,8 @@ export async function POST(req: Request) {
       });
 
       let stripeCustomerId: string | null = null;
-      if (process.env.STRIPE_SECRET_KEY) {
-        const customer = await getStripe().customers.create({
+      if (await isStripeConfigured()) {
+        const customer = await (await getStripe()).customers.create({
           email,
           metadata: { clerk_id: id },
         });
@@ -81,13 +91,7 @@ export async function POST(req: Request) {
           : {},
       });
 
-      await supabase.from("agents").insert({
-        user_id: id,
-        name: "Monzi",
-        slug: "aria",
-        role: "general_assistant",
-        is_default: true,
-      });
+      await createWorkspaceForOwner(id, "My Workspace", { isDefault: true });
 
       break;
     }

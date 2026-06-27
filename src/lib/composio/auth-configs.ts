@@ -12,7 +12,7 @@ export async function getOrCreateAuthConfigId(toolkit: string): Promise<string> 
     if (cached) return cached;
   }
 
-  const composio = getComposio();
+  const composio = await getComposio();
 
   const existing = await composio.authConfigs.list({
     toolkit,

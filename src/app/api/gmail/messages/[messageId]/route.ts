@@ -1,10 +1,15 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { adaptGmailMessageDetail } from "@/lib/composio/gmail-message";
+import { getComposioScope, type ComposioScopeOptions } from "@/lib/composio/scope";
 import { executeTool, listActiveConnections } from "@/lib/composio/tools";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
-async function assertGmailConnected(userId: string) {
-  const connections = await listActiveConnections(userId);
+async function assertGmailConnected(
+  workspaceId: string,
+  composioScope: ComposioScopeOptions
+) {
+  const connections = await listActiveConnections(workspaceId, composioScope);
   const connected = connections.some((c) => c.toolkit?.slug === "gmail");
   if (!connected) {
     return Response.json(
@@ -28,7 +33,7 @@ function unwrapComposioResult(result: unknown): unknown {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ messageId: string }> }
 ) {
   try {
@@ -37,14 +42,22 @@ export async function GET(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const denied = await assertGmailConnected(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
+    const composioScope = getComposioScope(ctx);
+    const denied = await assertGmailConnected(ctx.workspaceId, composioScope);
     if (denied) return denied;
 
     const { messageId } = await params;
-    const result = await executeTool(userId, "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", {
-      message_id: messageId,
-      format: "full",
-    });
+    const result = await executeTool(
+      ctx.workspaceId,
+      "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+      {
+        message_id: messageId,
+        format: "full",
+      },
+      undefined,
+      composioScope
+    );
 
     const detail = adaptGmailMessageDetail(unwrapComposioResult(result));
     if (!detail) {
@@ -60,7 +73,7 @@ export async function GET(
 }
 
 export async function PATCH(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ messageId: string }> }
 ) {
   try {
@@ -69,14 +82,22 @@ export async function PATCH(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const denied = await assertGmailConnected(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
+    const composioScope = getComposioScope(ctx);
+    const denied = await assertGmailConnected(ctx.workspaceId, composioScope);
     if (denied) return denied;
 
     const { messageId } = await params;
-    await executeTool(userId, "GMAIL_ADD_LABEL_TO_EMAIL", {
-      message_id: messageId,
-      remove_label_ids: ["UNREAD"],
-    });
+    await executeTool(
+      ctx.workspaceId,
+      "GMAIL_ADD_LABEL_TO_EMAIL",
+      {
+        message_id: messageId,
+        remove_label_ids: ["UNREAD"],
+      },
+      undefined,
+      composioScope
+    );
 
     return Response.json({ success: true });
   } catch (err) {

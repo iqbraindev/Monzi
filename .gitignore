@@ -39,6 +39,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# workspace uploads
+/data/workspace-logos/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

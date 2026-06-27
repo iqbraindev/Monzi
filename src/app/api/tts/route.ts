@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { synthesizeSpeech } from "@/lib/ai/speak-audio";
+import { getPlatformSecret, getPlatformSetting } from "@/lib/platform/config";
 import {
   clampElevenLabsSpeed,
   sanitizeForSpeech,
@@ -10,8 +11,8 @@ export const maxDuration = 30;
 
 const PLACEHOLDER = /^(sk-or-xxx|xxx|sk-xxx)$/i;
 
-function isElevenLabsConfigured(): boolean {
-  const key = process.env.ELEVENLABS_API_KEY?.trim();
+async function isElevenLabsConfigured(): Promise<boolean> {
+  const key = (await getPlatformSecret("elevenlabs.api_key"))?.trim();
   return Boolean(key && !PLACEHOLDER.test(key));
 }
 
@@ -40,20 +41,22 @@ export async function POST(req: Request) {
       return Response.json({ error: "text is empty after sanitization" }, { status: 400 });
     }
     const provider = body.provider ?? "elevenlabs";
+    const defaultVoiceId = await getPlatformSetting("elevenlabs.default_voice_id");
     const voiceId =
       body.voice_id?.trim() ||
       body.voice?.trim() ||
-      process.env.ELEVENLABS_DEFAULT_VOICE_ID ||
+      defaultVoiceId ||
       "EXAVITQu4vr4xnSDxMaL";
     const speed = clampElevenLabsSpeed(body.speed ?? 1);
 
-    if (provider === "elevenlabs" && isElevenLabsConfigured()) {
+    if (provider === "elevenlabs" && (await isElevenLabsConfigured())) {
+      const apiKey = await getPlatformSecret("elevenlabs.api_key");
       const res = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
         {
           method: "POST",
           headers: {
-            "xi-api-key": process.env.ELEVENLABS_API_KEY ?? "",
+            "xi-api-key": apiKey ?? "",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

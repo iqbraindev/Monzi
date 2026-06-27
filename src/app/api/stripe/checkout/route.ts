@@ -42,7 +42,8 @@ export async function POST(req: Request) {
 
     let customerId = sub?.stripe_customer_id;
     if (!customerId) {
-      const customer = await getStripe().customers.create({
+      const stripe = await getStripe();
+      const customer = await stripe.customers.create({
         metadata: { clerk_id: userId },
       });
       customerId = customer.id;
@@ -56,7 +57,8 @@ export async function POST(req: Request) {
     const currentSlug = (packRow as { slug?: string } | null)?.slug ?? "free";
 
     if (sub?.stripe_subscription_id && currentSlug !== "free") {
-      const stripeSub = await getStripe().subscriptions.retrieve(
+      const stripe = await getStripe();
+      const stripeSub = await stripe.subscriptions.retrieve(
         sub.stripe_subscription_id
       );
       const itemId = stripeSub.items.data[0]?.id;
@@ -67,13 +69,13 @@ export async function POST(req: Request) {
         );
       }
 
-      await getStripe().subscriptions.update(sub.stripe_subscription_id, {
+      await stripe.subscriptions.update(sub.stripe_subscription_id, {
         items: [{ id: itemId, price: priceId }],
         proration_behavior: "create_prorations",
         metadata: { userId, plan, cycle },
       });
 
-      const updatedSub = await getStripe().subscriptions.retrieve(
+      const updatedSub = await stripe.subscriptions.retrieve(
         sub.stripe_subscription_id
       );
       const { handleSubscriptionUpdated } = await import(
@@ -84,7 +86,8 @@ export async function POST(req: Request) {
       return Response.json({ updated: true, url: `${APP_URL}/billing?success=true` });
     }
 
-    const session = await getStripe().checkout.sessions.create({
+    const stripe = await getStripe();
+    const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
       payment_method_types: ["card"],

@@ -2,6 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/aria/app-shell";
+import { SuperAdminSync } from "@/components/auth/super-admin-sync";
+import { getClerkUserRole } from "@/lib/auth/super-admin";
+import { syncSuperAdminRole } from "@/lib/users/provision";
 
 export default async function AppLayout({
   children,
@@ -11,5 +14,15 @@ export default async function AppLayout({
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  return <AppShell>{children}</AppShell>;
+  await syncSuperAdminRole(userId);
+
+  const role = await getClerkUserRole(userId);
+  if (role === "super_admin") redirect("/admin");
+
+  return (
+    <>
+      <SuperAdminSync />
+      <AppShell>{children}</AppShell>
+    </>
+  );
 }

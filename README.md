@@ -16,6 +16,32 @@ Think **Notion + conversational AI + HubSpot** — but driven by AI agents you c
 - **Connect your apps** — OAuth integrations through [Composio](https://composio.dev) (Gmail, Google Calendar, Notion, Slack, HubSpot, Stripe, GitHub, and others).
 - **360° dashboard** — Drag-and-drop widgets on a personal dashboard; agents can create and update widgets through chat.
 - **Team & billing** — Clerk authentication, subscription plans via Stripe, subaccounts, and usage limits by plan.
+- **Multiple workspaces** — Each workspace is isolated (agents, dashboards, integrations). Plan limits set how many workspaces you can create and how many resources each workspace may use.
+
+---
+
+## Workspaces
+
+Monzi accounts can own multiple **workspaces**. Billing stays on the account; each workspace has its own agents, dashboards, Composio connections, and usage counters.
+
+| Plan | Max workspaces |
+|------|----------------|
+| Free | 1 |
+| Starter | 2 |
+| Pro | 5 |
+| Business | Unlimited |
+
+Switch workspaces from the sidebar. Create additional workspaces from the workspace menu (when your plan allows).
+
+### Composio integration migration
+
+OAuth connections are now scoped per workspace (`ws_{workspaceId}` in Composio). After upgrading:
+
+- Your **default workspace** keeps working via a legacy fallback to pre-migration connections tied to your Clerk user ID.
+- **New workspaces** need integrations connected again under Integrations.
+- To move connections fully to workspace scope, disconnect and reconnect each app in your default workspace once.
+
+Apply database migration `supabase/migrations/009_workspaces.sql` (included in Docker init) before using workspace features.
 
 ---
 

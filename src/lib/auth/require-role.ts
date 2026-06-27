@@ -1,5 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
+import { resolveUserRole } from "@/lib/auth/resolve-role";
+
 type AuthResult =
   | { userId: string; role: string; error?: never }
   | { userId?: never; role?: never; error: Response };
@@ -9,9 +11,7 @@ export async function requireAuth(): Promise<AuthResult> {
   if (!userId) {
     return { error: Response.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  const role =
-    (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role ??
-    "user";
+  const role = await resolveUserRole(userId, sessionClaims);
   return { userId, role };
 }
 

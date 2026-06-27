@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { ComposioScopeOptions } from "@/lib/composio/scope";
 import { listActiveConnections } from "@/lib/composio/tools";
 
 import type {
@@ -23,12 +24,12 @@ export interface DashboardSummary {
 
 export async function listDashboards(
   supabase: SupabaseClient,
-  userId: string
+  workspaceId: string
 ): Promise<DashboardWithWidgets[]> {
   const { data: dashboards } = await supabase
     .from("dashboards")
     .select("*")
-    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -56,9 +57,9 @@ export async function listDashboards(
 
 export async function listDashboardSummaries(
   supabase: SupabaseClient,
-  userId: string
+  workspaceId: string
 ): Promise<DashboardSummary[]> {
-  const dashboards = await listDashboards(supabase, userId);
+  const dashboards = await listDashboards(supabase, workspaceId);
   return dashboards.map((d) => ({
     id: d.id,
     name: d.name,
@@ -68,7 +69,7 @@ export async function listDashboardSummaries(
 
 export async function resolveDashboard(
   supabase: SupabaseClient,
-  userId: string,
+  workspaceId: string,
   params: { dashboardId?: string; dashboardName?: string }
 ): Promise<DbDashboard | null> {
   if (params.dashboardId) {
@@ -76,14 +77,14 @@ export async function resolveDashboard(
       .from("dashboards")
       .select("*")
       .eq("id", params.dashboardId)
-      .eq("user_id", userId)
+      .eq("workspace_id", workspaceId)
       .maybeSingle();
     return data ? (data as DbDashboard) : null;
   }
 
   if (params.dashboardName) {
     const normalized = params.dashboardName.trim().toLowerCase();
-    const dashboards = await listDashboards(supabase, userId);
+    const dashboards = await listDashboards(supabase, workspaceId);
     const matches = dashboards.filter(
       (d) => d.name.trim().toLowerCase() === normalized
     );
@@ -100,13 +101,14 @@ export async function resolveDashboard(
 }
 
 export async function assertWidgetConnection(
-  userId: string,
-  type: string
+  workspaceId: string,
+  type: string,
+  composioScope?: ComposioScopeOptions
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const toolkit = getRequiredToolkit(type);
   if (!toolkit) return { ok: true };
 
-  const connections = await listActiveConnections(userId);
+  const connections = await listActiveConnections(workspaceId, composioScope);
   const connected = connections.some(
     (c) => c.toolkit?.slug?.toLowerCase() === toolkit.toLowerCase()
   );
@@ -125,6 +127,7 @@ export async function createDashboard(
   supabase: SupabaseClient,
   params: {
     userId: string;
+    workspaceId: string;
     name: string;
     description?: string;
     icon?: string;
@@ -135,6 +138,7 @@ export async function createDashboard(
     .from("dashboards")
     .insert({
       user_id: params.userId,
+      workspace_id: params.workspaceId,
       name: params.name,
       description: params.description ?? null,
       icon: params.icon ?? "📊",
@@ -151,7 +155,7 @@ export async function createDashboard(
 export async function updateDashboard(
   supabase: SupabaseClient,
   params: {
-    userId: string;
+    workspaceId: string;
     dashboardId: string;
     name?: string;
     icon?: string;
@@ -171,7 +175,7 @@ export async function updateDashboard(
     .from("dashboards")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", params.dashboardId)
-    .eq("user_id", params.userId)
+    .eq("workspace_id", params.workspaceId)
     .select("*")
     .single();
 
@@ -181,21 +185,21 @@ export async function updateDashboard(
 
 export async function deleteDashboard(
   supabase: SupabaseClient,
-  userId: string,
+  workspaceId: string,
   dashboardId: string
 ): Promise<void> {
   const { error } = await supabase
     .from("dashboards")
     .delete()
     .eq("id", dashboardId)
-    .eq("user_id", userId);
+    .eq("workspace_id", workspaceId);
 
   if (error) throw new Error(error.message);
 }
 
 export async function deleteWidget(
   supabase: SupabaseClient,
-  userId: string,
+  workspaceId: string,
   dashboardId: string,
   widgetId: string
 ): Promise<void> {
@@ -203,7 +207,7 @@ export async function deleteWidget(
     .from("dashboards")
     .select("id")
     .eq("id", dashboardId)
-    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
 
   if (!dashboard) throw new Error("Dashboard not found");
@@ -220,7 +224,7 @@ export async function deleteWidget(
 export async function createWidget(
   supabase: SupabaseClient,
   params: {
-    userId: string;
+    workspaceId: string;
     dashboardId: string;
     type: string;
     title: string;
@@ -229,10 +233,15 @@ export async function createWidget(
     size?: "small" | "medium" | "large";
     createdBy?: "user" | "agent";
     skipConnectionCheck?: boolean;
+    composioScope?: ComposioScopeOptions;
   }
 ): Promise<DbWidget> {
   if (!params.skipConnectionCheck) {
-    const check = await assertWidgetConnection(params.userId, params.type);
+    const check = await assertWidgetConnection(
+      params.workspaceId,
+      params.type,
+      params.composioScope
+    );
     if (!check.ok) throw new Error(check.message);
   }
 
@@ -264,6 +273,7 @@ export async function logAgentAction(
   params: {
     agentId: string;
     userId: string;
+    workspaceId: string;
     actionType: string;
     payload?: Record<string, unknown>;
     conversationId?: string;
@@ -272,6 +282,7 @@ export async function logAgentAction(
   await supabase.from("agent_dashboard_actions").insert({
     agent_id: params.agentId,
     user_id: params.userId,
+    workspace_id: params.workspaceId,
     action_type: params.actionType,
     payload: params.payload ?? null,
     conversation_id: params.conversationId ?? null,

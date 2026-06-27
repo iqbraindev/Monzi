@@ -3,9 +3,10 @@ import { auth } from "@clerk/nextjs/server";
 import { deleteWidget } from "@/lib/dashboard/service";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string; widgetId: string }> }
 ) {
   try {
@@ -15,10 +16,11 @@ export async function DELETE(
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const { id: dashboardId, widgetId } = await params;
     const supabase = getSupabaseAdmin();
-    await deleteWidget(supabase, userId, dashboardId, widgetId);
+    await deleteWidget(supabase, ctx.workspaceId, dashboardId, widgetId);
 
     return Response.json({ success: true });
   } catch (err) {

@@ -1,11 +1,20 @@
 import { Composio } from "@composio/core";
 import { LangchainProvider } from "@composio/langchain";
 
+import { getPlatformSecret } from "@/lib/platform/config";
+
 let composioClient: Composio | null = null;
 let composioLangChainClient: Composio<LangchainProvider> | null = null;
+let composioClientKey: string | null = null;
 
-export function getComposioApiKey(): string {
-  const key = process.env.COMPOSIO_API_KEY;
+export function resetComposioClients(): void {
+  composioClient = null;
+  composioLangChainClient = null;
+  composioClientKey = null;
+}
+
+export async function getComposioApiKey(): Promise<string> {
+  const key = await getPlatformSecret("composio.api_key");
   if (!key) {
     throw new Error("COMPOSIO_API_KEY is not configured");
   }
@@ -13,27 +22,33 @@ export function getComposioApiKey(): string {
 }
 
 /** Base Composio client for connections, auth configs, and tool execution. */
-export function getComposio() {
-  if (!composioClient) {
-    composioClient = new Composio({
-      apiKey: getComposioApiKey(),
-      host: process.env.NEXT_PUBLIC_APP_NAME ?? "Monzi",
-      toolkitVersions: "latest",
-    });
+export async function getComposio() {
+  const apiKey = await getComposioApiKey();
+  if (composioClient && composioClientKey === apiKey) {
+    return composioClient;
   }
+  composioClient = new Composio({
+    apiKey,
+    host: process.env.NEXT_PUBLIC_APP_NAME ?? "Monzi",
+    toolkitVersions: "latest",
+  });
+  composioClientKey = apiKey;
   return composioClient;
 }
 
 /** Composio client with LangChain provider for agent chat tools. */
-export function getComposioLangChain() {
-  if (!composioLangChainClient) {
-    composioLangChainClient = new Composio({
-      apiKey: getComposioApiKey(),
-      host: process.env.NEXT_PUBLIC_APP_NAME ?? "Monzi",
-      provider: new LangchainProvider(),
-      toolkitVersions: "latest",
-    });
+export async function getComposioLangChain() {
+  const apiKey = await getComposioApiKey();
+  if (composioLangChainClient && composioClientKey === apiKey) {
+    return composioLangChainClient;
   }
+  composioLangChainClient = new Composio({
+    apiKey,
+    host: process.env.NEXT_PUBLIC_APP_NAME ?? "Monzi",
+    provider: new LangchainProvider(),
+    toolkitVersions: "latest",
+  });
+  composioClientKey = apiKey;
   return composioLangChainClient;
 }
 

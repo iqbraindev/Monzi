@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MoreHorizontal, Plus, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useLimits } from "@/hooks/use-workspaces";
 import { AGENTS, TEAM_MEMBERS, agentGradient } from "@/lib/aria/mock-data";
 import type { MemberStatus, TeamMember } from "@/lib/aria/types";
 
@@ -34,6 +35,41 @@ function usageColor(ratio: number) {
   return "#7C3AED";
 }
 
+function SubaccountSeatMeter({ onInvite }: { onInvite: () => void }) {
+  const { data: limitsData } = useLimits();
+  const used = limitsData?.usage?.subaccounts ?? 0;
+  const max = limitsData?.limits?.max_subaccounts ?? 0;
+  const unlimited = max < 0;
+  const ratio = unlimited || max === 0 ? 0 : used / max;
+
+  return (
+    <>
+      <button
+        onClick={onInvite}
+        className="aria-gradient inline-flex h-10 items-center gap-2 rounded-full px-[18px] text-sm font-semibold text-white shadow-[0_6px_20px_rgba(124,58,237,0.3)] transition-[filter] hover:brightness-110"
+      >
+        <Plus className="size-4" />
+        Invite Member
+      </button>
+      <div className="flex items-center gap-2.5">
+        <span className="font-mono text-xs text-aria-text-secondary">
+          {unlimited
+            ? `${used} seats used`
+            : `${used} of ${max} seats used`}
+        </span>
+        {!unlimited && max > 0 && (
+          <span className="inline-block h-[5px] w-[90px] overflow-hidden rounded-full bg-aria-subtle">
+            <span
+              className="aria-gradient block h-full rounded-full"
+              style={{ width: `${Math.min(100, ratio * 100)}%` }}
+            />
+          </span>
+        )}
+      </div>
+    </>
+  );
+}
+
 export function SubaccountsView() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
@@ -51,24 +87,7 @@ export function SubaccountsView() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <button
-            onClick={() => setInviteOpen(true)}
-            className="aria-gradient inline-flex h-10 items-center gap-2 rounded-full px-[18px] text-sm font-semibold text-white shadow-[0_6px_20px_rgba(124,58,237,0.3)] transition-[filter] hover:brightness-110"
-          >
-            <Plus className="size-4" />
-            Invite Member
-          </button>
-          <div className="flex items-center gap-2.5">
-            <span className="font-mono text-xs text-aria-text-secondary">
-              {TEAM_MEMBERS.length} of 5 seats used
-            </span>
-            <span className="inline-block h-[5px] w-[90px] overflow-hidden rounded-full bg-aria-subtle">
-              <span
-                className="aria-gradient block h-full rounded-full"
-                style={{ width: `${(TEAM_MEMBERS.length / 5) * 100}%` }}
-              />
-            </span>
-          </div>
+          <SubaccountSeatMeter onInvite={() => setInviteOpen(true)} />
         </div>
       </div>
 

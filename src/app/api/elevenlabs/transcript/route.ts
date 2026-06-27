@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 /**
  * Persists a single spoken turn from an ElevenLabs voice call into the
@@ -14,6 +15,8 @@ export async function POST(req: Request) {
     if (!userId) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const body = (await req.json().catch(() => ({}))) as {
       conversationId?: string;
@@ -36,7 +39,7 @@ export async function POST(req: Request) {
       .from("conversations")
       .select("id")
       .eq("id", conversationId)
-      .eq("user_id", userId)
+      .eq("workspace_id", ctx.workspaceId)
       .maybeSingle();
 
     if (!conversation) {

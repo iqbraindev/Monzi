@@ -1,20 +1,23 @@
 import { auth } from "@clerk/nextjs/server";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 import { getOrCreateAuthConfigId } from "@/lib/composio/auth-configs";
 import { assignToolkitToAgents } from "@/lib/composio/agent-toolkits";
-import { getAppCallbackUrl, getComposio } from "@/lib/composio/client";
-import {
-  getUserIntegrationLimit,
-  incrementIntegrationsConnected,
-} from "@/lib/composio/limits";
-import { listActiveConnections } from "@/lib/composio/tools";
+import { getAppCallbackUrl } from "@/lib/composio/client";
+import { incrementIntegrationsConnected } from "@/lib/composio/limits";
+import { getComposioScope } from "@/lib/composio/scope";
+import { initiateConnection, listActiveConnections } from "@/lib/composio/tools";
+import { canConnectIntegration } from "@/lib/billing/limit-enforcer";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const ctx = await resolveWorkspaceContext(userId, { request: req });
+  const composioScope = getComposioScope(ctx);
 
   const body = (await req.json()) as {
     toolkit?: string;
@@ -27,36 +30,34 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const existing = await listActiveConnections(userId);
+    const existing = await listActiveConnections(ctx.workspaceId, composioScope);
     const alreadyConnected = existing.some(
       (c) => c.toolkit?.slug === toolkit
     );
 
     if (!alreadyConnected) {
-      const limit = await getUserIntegrationLimit(userId);
-      if (limit >= 0 && existing.length >= limit) {
-        return Response.json(
-          { error: `Integration limit reached (${limit})` },
-          { status: 403 }
-        );
+      const integrationCheck = await canConnectIntegration(
+        ctx.workspaceId,
+        ctx.ownerUserId,
+        composioScope
+      );
+      if (!integrationCheck.ok) {
+        return Response.json(integrationCheck.error, { status: 403 });
       }
     }
 
     const authConfigId = await getOrCreateAuthConfigId(toolkit);
-    const composio = getComposio();
 
-    const connectionRequest = await composio.connectedAccounts.initiate(
-      userId,
+    const connectionRequest = await initiateConnection(
+      ctx.workspaceId,
       authConfigId,
-      {
-        callbackUrl: getAppCallbackUrl("/api/composio/callback"),
-      }
+      getAppCallbackUrl("/api/composio/callback")
     );
 
-    await assignToolkitToAgents(userId, toolkit, body.agentIds);
+    await assignToolkitToAgents(ctx.workspaceId, toolkit, body.agentIds);
 
     if (!alreadyConnected) {
-      await incrementIntegrationsConnected(userId);
+      await incrementIntegrationsConnected(ctx.workspaceId, ctx.ownerUserId);
     }
 
     return Response.json({

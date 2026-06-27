@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { dbMessagesToUiMessages } from "@/lib/chat/message-mapper";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function GET(
   req: Request,
@@ -15,6 +16,7 @@ export async function GET(
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const { agentId } = await params;
     const url = new URL(req.url);
@@ -26,7 +28,7 @@ export async function GET(
       .from("agents")
       .select("id")
       .eq("id", agentId)
-      .eq("user_id", userId)
+      .eq("workspace_id", ctx.workspaceId)
       .maybeSingle();
 
     if (!agentRow) {
@@ -37,7 +39,7 @@ export async function GET(
       .from("conversations")
       .select("id")
       .eq("agent_id", agentId)
-      .eq("user_id", userId);
+      .eq("workspace_id", ctx.workspaceId);
 
     if (conversationId) {
       convoQuery = convoQuery.eq("id", conversationId);

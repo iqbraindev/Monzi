@@ -62,10 +62,12 @@ export function parseCreateAgentBody(body: CreateAgentBody): AgentBuilderDraft {
 export function draftToDbRow(
   draft: AgentBuilderDraft,
   userId: string,
+  workspaceId: string,
   slug: string
 ) {
   return {
     user_id: userId,
+    workspace_id: workspaceId,
     name: draft.name,
     slug,
     role: draft.role,

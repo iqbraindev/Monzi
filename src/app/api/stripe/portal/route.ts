@@ -23,7 +23,7 @@ export async function POST() {
       );
     }
 
-    const session = await getStripe().billingPortal.sessions.create({
+    const session = await (await getStripe()).billingPortal.sessions.create({
       customer: customerId,
       return_url: `${APP_URL}/billing`,
     });

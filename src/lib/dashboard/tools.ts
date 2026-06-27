@@ -14,10 +14,13 @@ import {
   resolveDashboard,
 } from "@/lib/dashboard/service";
 import { defaultDataSource, WIDGET_TYPES } from "@/lib/dashboard/widget-registry";
+import type { ComposioScopeOptions } from "@/lib/composio/scope";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export interface DashboardToolsContext {
   userId: string;
+  workspaceId: string;
+  composioScope: ComposioScopeOptions;
   agentId: string;
   conversationId?: string;
 }
@@ -31,7 +34,7 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
         "List the user's dashboards (id and name). Use before adding widgets when you need to confirm which dashboard exists.",
       inputSchema: z.object({}),
       execute: async () => {
-        const summaries = await listDashboardSummaries(supabase, ctx.userId);
+        const summaries = await listDashboardSummaries(supabase, ctx.workspaceId);
         if (summaries.length === 0) {
           return "The user has no dashboards yet. Ask them for a name and use create_dashboard to create one.";
         }
@@ -66,14 +69,18 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
           return "Which dashboard should I add this to? List the user's dashboards or ask them to name one — I can create a new dashboard if they provide a name.";
         }
 
-        const connectionCheck = await assertWidgetConnection(ctx.userId, params.type);
+        const connectionCheck = await assertWidgetConnection(
+          ctx.workspaceId,
+          params.type,
+          ctx.composioScope
+        );
         if (!connectionCheck.ok) {
           return connectionCheck.message;
         }
 
         let dashboard: Awaited<ReturnType<typeof resolveDashboard>> = null;
         try {
-          dashboard = await resolveDashboard(supabase, ctx.userId, {
+          dashboard = await resolveDashboard(supabase, ctx.workspaceId, {
             dashboardId: params.dashboard_id,
             dashboardName: params.dashboard_name,
           });
@@ -90,11 +97,12 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
           params.type as import("@/lib/dashboard/types").WidgetType
         );
         const widget = await createWidget(supabase, {
-          userId: ctx.userId,
+          workspaceId: ctx.workspaceId,
           dashboardId: dashboard.id,
           type: params.type,
           title: params.title,
           size: params.size,
+          composioScope: ctx.composioScope,
           dataSource: {
             integration: params.integration ?? baseSource.integration,
             composio_tool: params.composio_tool ?? baseSource.composio_tool,
@@ -108,6 +116,7 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
           await logAgentAction(supabase, {
             agentId: ctx.agentId,
             userId: ctx.userId,
+            workspaceId: ctx.workspaceId,
             actionType: "create_widget",
             conversationId: ctx.conversationId,
             payload: {
@@ -121,7 +130,7 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
           console.warn("[create_dashboard_widget] logAgentAction failed", err);
         }
 
-        await broadcastWidgetCreated(ctx.userId, dashboard.id, widget);
+        await broadcastWidgetCreated(ctx.workspaceId, dashboard.id, widget);
 
         return `Widget "${params.title}" has been added to the "${dashboard.name}" dashboard.`;
       },
@@ -147,6 +156,7 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
       execute: async (params) => {
         const dashboard = await createDashboard(supabase, {
           userId: ctx.userId,
+          workspaceId: ctx.workspaceId,
           name: params.name,
           description: params.description,
           icon: params.icon ?? "📊",
@@ -156,17 +166,22 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
         const widgets: Awaited<ReturnType<typeof createWidget>>[] = [];
         for (let i = 0; i < params.widgets.length; i++) {
           const w = params.widgets[i];
-          const connectionCheck = await assertWidgetConnection(ctx.userId, w.type);
+          const connectionCheck = await assertWidgetConnection(
+            ctx.workspaceId,
+            w.type,
+            ctx.composioScope
+          );
           if (!connectionCheck.ok) {
             throw new Error(connectionCheck.message);
           }
           widgets.push(
             await createWidget(supabase, {
-              userId: ctx.userId,
+              workspaceId: ctx.workspaceId,
               dashboardId: dashboard.id,
               type: w.type,
               title: w.title,
               size: w.size,
+              composioScope: ctx.composioScope,
               layout: {
                 x: (i % 2) * 6,
                 y: Math.floor(i / 2) * 4,
@@ -181,12 +196,13 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
         await logAgentAction(supabase, {
           agentId: ctx.agentId,
           userId: ctx.userId,
+          workspaceId: ctx.workspaceId,
           actionType: "create_dashboard",
           conversationId: ctx.conversationId,
           payload: { dashboardId: dashboard.id, name: params.name },
         });
 
-        await broadcastDashboardCreated(ctx.userId, dashboard, widgets, true);
+        await broadcastDashboardCreated(ctx.workspaceId, dashboard, widgets, true);
 
         return `I've created the "${params.name}" dashboard with ${widgets.length} widget(s) and switched you to it.`;
       },

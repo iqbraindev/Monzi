@@ -1,16 +1,20 @@
 import { auth } from "@clerk/nextjs/server";
 
+import { getComposioScope } from "@/lib/composio/scope";
 import { listActiveConnections } from "@/lib/composio/tools";
 import { integrationNameFromToolkit } from "@/lib/composio/toolkits";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
-export async function GET() {
+export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const accounts = await listActiveConnections(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
+    const composioScope = getComposioScope(ctx);
+    const accounts = await listActiveConnections(ctx.workspaceId, composioScope);
     const connections = accounts.map((account) => ({
       id: account.id,
       toolkit: account.toolkit?.slug ?? "",

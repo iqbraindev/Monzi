@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 
 import type { InvoiceRow } from "@/lib/billing/types";
 import { getStripeCustomerId } from "@/lib/billing/subscription";
-import { getStripe } from "@/lib/stripe/client";
+import { getStripe, isStripeConfigured } from "@/lib/stripe/client";
 import { ensureSupabaseUser } from "@/lib/users/provision";
 
 export async function GET() {
@@ -15,11 +15,11 @@ export async function GET() {
     await ensureSupabaseUser(userId);
     const customerId = await getStripeCustomerId(userId);
 
-    if (!customerId || !process.env.STRIPE_SECRET_KEY) {
+    if (!customerId || !(await isStripeConfigured())) {
       return Response.json({ invoices: [] as InvoiceRow[] });
     }
 
-    const invoices = await getStripe().invoices.list({
+    const invoices = await (await getStripe()).invoices.list({
       customer: customerId,
       limit: 24,
     });

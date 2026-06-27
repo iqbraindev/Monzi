@@ -1,3 +1,4 @@
+import { getPlatformSecret } from "@/lib/platform/config";
 import {
   FALLBACK_VOICE_OPTIONS,
   type AgentVoiceOption,
@@ -28,7 +29,7 @@ export async function fetchElevenLabsVoiceOptions(): Promise<AgentVoiceOption[]>
     return cachedVoices.data;
   }
 
-  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
+  const apiKey = (await getPlatformSecret("elevenlabs.api_key"))?.trim();
   if (!apiKey) {
     return FALLBACK_VOICE_OPTIONS;
   }

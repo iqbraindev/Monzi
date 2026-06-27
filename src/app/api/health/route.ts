@@ -1,3 +1,5 @@
+import { getComposio } from "@/lib/composio/client";
+import { getPlatformSecret } from "@/lib/platform/config";
 import { getRedis } from "@/lib/redis/client";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -59,10 +61,10 @@ export async function GET() {
     checks.redis = { ok: false, error: "Not configured" };
   }
 
-  if (process.env.COMPOSIO_API_KEY) {
+  const composioKey = await getPlatformSecret("composio.api_key");
+  if (composioKey) {
     try {
-      const { getComposio } = await import("@/lib/composio/client");
-      await getComposio().connectedAccounts.list({ limit: 1 });
+      await (await getComposio()).connectedAccounts.list({ limit: 1 });
       checks.composio = { ok: true };
     } catch (err) {
       checks.composio = {

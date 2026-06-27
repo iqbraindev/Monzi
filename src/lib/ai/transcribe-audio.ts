@@ -1,18 +1,20 @@
 import {
   getOpenRouterApiKey,
+  getOpenRouterModels,
   getOpenRouterRequestHeaders,
 } from "@/lib/ai/openrouter";
+import { getPlatformSecret, getPlatformSetting } from "@/lib/platform/config";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const PLACEHOLDER = /^(sk-or-xxx|xxx|sk-xxx)$/i;
 
-function isDeepgramConfigured(): boolean {
-  const key = process.env.DEEPGRAM_API_KEY?.trim();
+async function isDeepgramConfigured(): Promise<boolean> {
+  const key = (await getPlatformSecret("deepgram.api_key"))?.trim();
   return Boolean(key && !PLACEHOLDER.test(key));
 }
 
-function isOpenAiConfigured(): boolean {
-  const key = process.env.OPENAI_API_KEY?.trim();
+async function isOpenAiConfigured(): Promise<boolean> {
+  const key = (await getPlatformSecret("openai.api_key"))?.trim();
   return Boolean(key && !PLACEHOLDER.test(key));
 }
 
@@ -29,8 +31,10 @@ async function transcribeWithDeepgram(
   mimeType: string,
   language?: string
 ): Promise<string> {
+  const apiKey = await getPlatformSecret("deepgram.api_key");
+  const model = (await getPlatformSetting("deepgram.stt_model")) ?? "nova-3";
   const params = new URLSearchParams({
-    model: process.env.DEEPGRAM_STT_MODEL ?? "nova-3",
+    model,
     smart_format: "true",
   });
   if (language) params.set("language", language.split("-")[0]!);
@@ -38,7 +42,7 @@ async function transcribeWithDeepgram(
   const res = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
     method: "POST",
     headers: {
-      Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+      Authorization: `Token ${apiKey}`,
       "Content-Type": mimeType || "audio/webm",
     },
     body: buffer,
@@ -60,8 +64,9 @@ async function transcribeWithOpenRouter(
   mimeType: string,
   language?: string
 ): Promise<string> {
+  const models = await getOpenRouterModels();
   const body: Record<string, unknown> = {
-    model: process.env.OPENROUTER_STT_MODEL ?? "openai/whisper-large-v3",
+    model: models.stt,
     input_audio: {
       data: Buffer.from(buffer).toString("base64"),
       format: audioFormatFromMime(mimeType),
@@ -72,7 +77,7 @@ async function transcribeWithOpenRouter(
   const res = await fetch(`${OPENROUTER_BASE_URL}/audio/transcriptions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${getOpenRouterApiKey()}`,
+      Authorization: `Bearer ${await getOpenRouterApiKey()}`,
       "Content-Type": "application/json",
       ...getOpenRouterRequestHeaders(),
     },
@@ -96,12 +101,14 @@ async function transcribeWithOpenAI(
   language?: string
 ): Promise<string> {
   const OpenAI = (await import("openai")).default;
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const apiKey = await getPlatformSecret("openai.api_key");
+  const model = (await getPlatformSetting("openai.stt_model")) ?? "whisper-1";
+  const client = new OpenAI({ apiKey: apiKey ?? undefined });
   const file = new File([buffer], "recording.webm", { type: mimeType });
 
   const result = await client.audio.transcriptions.create({
     file,
-    model: process.env.OPENAI_STT_MODEL ?? "whisper-1",
+    model,
     ...(language ? { language: language.split("-")[0] } : {}),
   });
 
@@ -113,21 +120,21 @@ export async function transcribeAudio(
   mimeType: string,
   language?: string
 ): Promise<string> {
-  if (isDeepgramConfigured()) {
+  if (await isDeepgramConfigured()) {
     return transcribeWithDeepgram(buffer, mimeType, language);
   }
 
   try {
     return await transcribeWithOpenRouter(buffer, mimeType, language);
   } catch (openRouterError) {
-    if (!isOpenAiConfigured()) throw openRouterError;
+    if (!(await isOpenAiConfigured())) throw openRouterError;
     return transcribeWithOpenAI(buffer, mimeType, language);
   }
 }
 
-export function isTranscriptionConfigured(): boolean {
-  if (isDeepgramConfigured()) return true;
-  const openRouter = process.env.OPENROUTER_API_KEY?.trim();
+export async function isTranscriptionConfigured(): Promise<boolean> {
+  if (await isDeepgramConfigured()) return true;
+  const openRouter = (await getPlatformSecret("openrouter.api_key"))?.trim();
   if (openRouter && !PLACEHOLDER.test(openRouter)) return true;
   return isOpenAiConfigured();
 }

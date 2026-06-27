@@ -1,26 +1,27 @@
 "use client";
 
 import { useEffect } from "react";
-import { useAuth } from "@clerk/nextjs";
 
 import { createClient } from "@/lib/supabase/client";
 import type { DbDashboard, DbWidget } from "@/lib/dashboard/types";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { useInvalidateDashboards } from "@/hooks/use-dashboards";
+import { useLimits } from "@/hooks/use-workspaces";
 
 export function useRealtimeDashboard() {
-  const { userId } = useAuth();
+  const { data: limitsData } = useLimits();
+  const workspaceId = limitsData?.workspaceId as string | undefined;
   const addWidget = useDashboardStore((s) => s.addWidget);
   const addDashboard = useDashboardStore((s) => s.addDashboard);
   const setActiveDashboard = useDashboardStore((s) => s.setActiveDashboard);
   const invalidate = useInvalidateDashboards();
 
   useEffect(() => {
-    if (!userId) return;
+    if (!workspaceId) return;
 
     const supabase = createClient();
     const channel = supabase
-      .channel(`user:${userId}`)
+      .channel(`workspace:${workspaceId}`)
       .on("broadcast", { event: "widget:created" }, ({ payload }) => {
         const p = payload as { widget: DbWidget; dashboardId: string };
         if (p?.widget && p?.dashboardId) {
@@ -45,5 +46,5 @@ export function useRealtimeDashboard() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, addWidget, addDashboard, setActiveDashboard, invalidate]);
+  }, [workspaceId, addWidget, addDashboard, setActiveDashboard, invalidate]);
 }

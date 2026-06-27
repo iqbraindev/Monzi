@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 
+import { getPlatformSecret } from "@/lib/platform/config";
 import {
   handleCheckoutCompleted,
   handleInvoicePaid,
@@ -12,18 +13,16 @@ import { getStripe } from "@/lib/stripe/client";
 export async function POST(req: Request) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
+  const webhookSecret = await getPlatformSecret("stripe.webhook_secret");
 
-  if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
+  if (!sig || !webhookSecret) {
     return Response.json({ error: "Missing webhook configuration" }, { status: 400 });
   }
 
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(
-      body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
+    const stripe = await getStripe();
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch {
     return Response.json({ error: "Invalid signature" }, { status: 400 });
   }

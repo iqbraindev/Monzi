@@ -14,7 +14,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!isTranscriptionConfigured()) {
+    if (!(await isTranscriptionConfigured())) {
       return Response.json(
         { error: "Speech transcription is not configured on the server" },
         { status: 503 }

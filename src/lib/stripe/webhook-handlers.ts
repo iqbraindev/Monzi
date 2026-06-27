@@ -95,7 +95,7 @@ export async function handleCheckoutCompleted(
   if (!userId || !subscriptionId || typeof subscriptionId !== "string") return;
 
   const { getStripe } = await import("@/lib/stripe/client");
-  const stripeSub = await getStripe().subscriptions.retrieve(subscriptionId);
+  const stripeSub = await (await getStripe()).subscriptions.retrieve(subscriptionId);
   await syncSubscriptionFromStripe(stripeSub, userId);
 }
 
@@ -117,7 +117,7 @@ export async function handleInvoicePaid(
   await resetMonthlyUsage(sub.user_id);
 
   const { getStripe } = await import("@/lib/stripe/client");
-  const stripeSub = await getStripe().subscriptions.retrieve(subscriptionId);
+  const stripeSub = await (await getStripe()).subscriptions.retrieve(subscriptionId);
   const period = getSubscriptionPeriod(stripeSub);
 
   await supabase

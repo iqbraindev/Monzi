@@ -6,6 +6,7 @@ import {
 } from "@/lib/dashboard/service";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function PATCH(
   req: Request,
@@ -18,6 +19,7 @@ export async function PATCH(
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const { id: dashboardId } = await params;
     const body = (await req.json()) as {
@@ -28,7 +30,7 @@ export async function PATCH(
 
     const supabase = getSupabaseAdmin();
     const dashboard = await updateDashboard(supabase, {
-      userId,
+      workspaceId: ctx.workspaceId,
       dashboardId,
       name: body.name?.trim() || undefined,
       icon: body.icon,
@@ -45,7 +47,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -55,10 +57,11 @@ export async function DELETE(
     }
 
     await ensureSupabaseUser(userId);
+    const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const { id: dashboardId } = await params;
     const supabase = getSupabaseAdmin();
-    await deleteDashboard(supabase, userId, dashboardId);
+    await deleteDashboard(supabase, ctx.workspaceId, dashboardId);
 
     return Response.json({ success: true });
   } catch (err) {

@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { getStripe } from "@/lib/stripe/client";
+import { getStripe, isStripeConfigured } from "@/lib/stripe/client";
 
 import type {
   BillingOverview,
@@ -11,6 +11,7 @@ import type {
 import { getCurrentUsage } from "@/lib/billing/usage";
 
 const DEFAULT_LIMITS: PackLimits = {
+  max_workspaces: 1,
   max_agents: 1,
   max_subaccounts: 0,
   ai_messages_per_month: 50,
@@ -33,6 +34,9 @@ function mergeLimits(
   if (!custom) return base;
   return {
     ...base,
+    ...(typeof custom.max_workspaces === "number"
+      ? { max_workspaces: custom.max_workspaces }
+      : {}),
     ...(typeof custom.max_agents === "number"
       ? { max_agents: custom.max_agents }
       : {}),
@@ -60,6 +64,8 @@ function mergeLimits(
 function rowToLimits(row: Record<string, unknown> | null): PackLimits {
   if (!row) return DEFAULT_LIMITS;
   return {
+    max_workspaces:
+      (row.max_workspaces as number) ?? DEFAULT_LIMITS.max_workspaces,
     max_agents: (row.max_agents as number) ?? DEFAULT_LIMITS.max_agents,
     max_subaccounts:
       (row.max_subaccounts as number) ?? DEFAULT_LIMITS.max_subaccounts,
@@ -138,10 +144,10 @@ export async function getAllPacks(): Promise<Pack[]> {
 async function getPaymentMethod(
   customerId: string | null
 ): Promise<PaymentMethodInfo | null> {
-  if (!customerId || !process.env.STRIPE_SECRET_KEY) return null;
+  if (!customerId || !(await isStripeConfigured())) return null;
 
   try {
-    const customer = await getStripe().customers.retrieve(customerId, {
+    const customer = await (await getStripe()).customers.retrieve(customerId, {
       expand: ["invoice_settings.default_payment_method"],
     });
 

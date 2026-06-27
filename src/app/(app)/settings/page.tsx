@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSyncExternalStore } from "react";
 
 import {
@@ -10,6 +11,9 @@ import {
   type NotificationPrefKey,
   type SettingsPrefsSnapshot,
 } from "@/lib/settings/preferences";
+import { ProfileSection } from "@/components/settings/profile-section";
+import { WorkspaceProfileSection } from "@/components/settings/workspace-profile-section";
+import { useLimits, useWorkspaces } from "@/hooks/use-workspaces";
 import { cn } from "@/lib/utils";
 import { writeVoiceModePreference } from "@/lib/voice/preferences";
 
@@ -51,6 +55,42 @@ export default function SettingsPage() {
     readSettingsPrefsSnapshot,
     readSettingsPrefsServerSnapshot
   );
+  const { data: limitsData } = useLimits();
+  const { data: workspacesData } = useWorkspaces();
+  const [deleting, setDeleting] = useState(false);
+
+  const activeWorkspaceId = limitsData?.workspaceId as string | undefined;
+  const activeWorkspace = workspacesData?.workspaces.find(
+    (w) => w.id === activeWorkspaceId
+  );
+  const canDelete =
+    activeWorkspace?.member_role === "owner" && !activeWorkspace?.is_default;
+
+  async function handleDeleteWorkspace() {
+    if (!activeWorkspaceId || !canDelete) return;
+    if (
+      !window.confirm(
+        "Delete this workspace and all its agents, dashboards, and data? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/workspaces/${activeWorkspaceId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to delete workspace");
+      }
+      window.location.href = "/dashboard";
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete workspace");
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-[820px] px-7 pt-7 pb-12">
@@ -65,26 +105,12 @@ export default function SettingsPage() {
 
       {/* Profile */}
       <Card title="Profile">
-        <p className="-mt-2 text-xs text-aria-text-secondary">
-          Profile fields are placeholders until account management is wired up.
-        </p>
-        <div className="flex items-center gap-4">
-          <span
-            className="flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-semibold text-white"
-            style={{ background: "linear-gradient(135deg,#6366F1,#06B6D4)" }}
-          >
-            DK
-          </span>
-          <button className="h-9 rounded-full border border-aria-border bg-aria-elevated px-4 text-[13px] font-semibold text-aria-text transition-colors hover:border-aria-primary">
-            Change avatar
-          </button>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Full name" defaultValue="Dana Kessler" />
-          <Field label="Email" defaultValue="dana@meridian.co" />
-          <Field label="Workspace" defaultValue="My Workspace" />
-          <Field label="Role" defaultValue="Owner" disabled />
-        </div>
+        <ProfileSection />
+      </Card>
+
+      {/* Workspace */}
+      <Card title="Workspace">
+        <WorkspaceProfileSection />
       </Card>
 
       {/* Preferences */}
@@ -132,8 +158,13 @@ export default function SettingsPage() {
           <span className="text-[13px] text-aria-text-secondary">
             Permanently delete your workspace and all associated data.
           </span>
-          <button className="h-9 rounded-full border border-aria-danger/40 px-4 text-[13px] font-semibold text-aria-danger transition-colors hover:bg-aria-danger/10">
-            Delete workspace
+          <button
+            type="button"
+            disabled={!canDelete || deleting}
+            onClick={() => void handleDeleteWorkspace()}
+            className="h-9 rounded-full border border-aria-danger/40 px-4 text-[13px] font-semibold text-aria-danger transition-colors hover:bg-aria-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deleting ? "Deleting..." : "Delete workspace"}
           </button>
         </div>
       </div>
@@ -158,25 +189,3 @@ function Card({
   );
 }
 
-function Field({
-  label,
-  defaultValue,
-  disabled,
-}: {
-  label: string;
-  defaultValue: string;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="flex flex-col gap-2">
-      <span className="text-xs font-semibold text-aria-text-secondary">
-        {label}
-      </span>
-      <input
-        defaultValue={defaultValue}
-        disabled={disabled}
-        className="h-[42px] rounded-[11px] border border-aria-border bg-aria-surface px-3.5 text-sm text-aria-text outline-none transition-all focus:border-aria-primary focus:shadow-[0_0_0_3px_rgba(124,58,237,0.14)] disabled:cursor-not-allowed disabled:opacity-60"
-      />
-    </label>
-  );
-}

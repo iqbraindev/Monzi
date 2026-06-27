@@ -1,10 +1,14 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { ComposioScopeOptions } from "@/lib/composio/scope";
 import { listActiveConnections } from "@/lib/composio/tools";
 
 type AgentTools = { composio_apps?: string[] };
 
-export async function getConnectedToolkitSlugs(userId: string): Promise<string[]> {
-  const connections = await listActiveConnections(userId);
+export async function getConnectedToolkitSlugs(
+  workspaceId: string,
+  scope?: ComposioScopeOptions
+): Promise<string[]> {
+  const connections = await listActiveConnections(workspaceId, scope);
   return [
     ...new Set(
       connections
@@ -15,7 +19,7 @@ export async function getConnectedToolkitSlugs(userId: string): Promise<string[]
 }
 
 export async function assignToolkitToAgents(
-  userId: string,
+  workspaceId: string,
   toolkit: string,
   agentIds?: string[]
 ) {
@@ -26,7 +30,7 @@ export async function assignToolkitToAgents(
     const { data: agents } = await supabase
       .from("agents")
       .select("id")
-      .eq("user_id", userId);
+      .eq("workspace_id", workspaceId);
     targetIds = (agents ?? []).map((a) => a.id);
   }
 
@@ -35,7 +39,7 @@ export async function assignToolkitToAgents(
       .from("agents")
       .select("tools")
       .eq("id", agentId)
-      .eq("user_id", userId)
+      .eq("workspace_id", workspaceId)
       .single();
 
     if (!agent) continue;
@@ -51,16 +55,19 @@ export async function assignToolkitToAgents(
         updated_at: new Date().toISOString(),
       })
       .eq("id", agentId)
-      .eq("user_id", userId);
+      .eq("workspace_id", workspaceId);
   }
 }
 
-export async function removeToolkitFromAgents(userId: string, toolkit: string) {
+export async function removeToolkitFromAgents(
+  workspaceId: string,
+  toolkit: string
+) {
   const supabase = getSupabaseAdmin();
   const { data: agents } = await supabase
     .from("agents")
     .select("id, tools")
-    .eq("user_id", userId);
+    .eq("workspace_id", workspaceId);
 
   if (!agents) return;
 
@@ -79,12 +86,11 @@ export async function removeToolkitFromAgents(userId: string, toolkit: string) {
   }
 }
 
-/** Assign every active Composio connection to all of the user's agents. */
 export async function syncAllConnectionsToAgents(
-  userId: string,
+  workspaceId: string,
   toolkits: string[]
 ) {
   for (const toolkit of toolkits) {
-    await assignToolkitToAgents(userId, toolkit);
+    await assignToolkitToAgents(workspaceId, toolkit);
   }
 }

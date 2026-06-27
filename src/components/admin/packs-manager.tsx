@@ -1,13 +1,19 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Shield } from "lucide-react";
+import { Loader2, Plus, Package } from "lucide-react";
 import { useState } from "react";
 
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import {
+  adminButtonOutline,
+  adminButtonPrimary,
+} from "@/components/admin/admin-button-styles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Pack, PackLimits } from "@/lib/billing/types";
+import { cn } from "@/lib/utils";
 
 async function fetchAdminPacks(): Promise<Pack[]> {
   const res = await fetch("/api/admin/packs");
@@ -20,6 +26,7 @@ async function fetchAdminPacks(): Promise<Pack[]> {
 }
 
 const EMPTY_LIMITS: PackLimits = {
+  max_workspaces: 1,
   max_agents: 1,
   max_subaccounts: 0,
   ai_messages_per_month: 50,
@@ -153,27 +160,20 @@ export function PacksManager() {
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-7 pt-7 pb-12">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <div className="mb-1 flex items-center gap-2 text-aria-primary-light">
-            <Shield className="size-4" />
-            <span className="text-xs font-semibold uppercase tracking-wide">
-              Super Admin
-            </span>
-          </div>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-aria-text">
-            Package management
-          </h1>
-          <p className="mt-1.5 text-sm text-aria-text-secondary">
-            Create and edit subscription packs, pricing, Stripe price IDs, and
-            usage limits.
-          </p>
-        </div>
-        <Button className="rounded-full" onClick={startCreate}>
-          <Plus className="size-4" />
-          New pack
-        </Button>
-      </div>
+      <AdminPageHeader
+        icon={Package}
+        title="Package management"
+        description="Create and edit subscription packs, pricing, Stripe price IDs, and usage limits."
+        action={
+          <Button
+            className={cn("rounded-full", adminButtonPrimary)}
+            onClick={startCreate}
+          >
+            <Plus className="size-4" />
+            New pack
+          </Button>
+        }
+      />
 
       {(editingId === "new" || editingId) && (
         <div className="mb-6 rounded-2xl border border-aria-border bg-aria-surface/70 p-6">
@@ -233,6 +233,15 @@ export function PacksManager() {
                 value={draft.stripe_price_id_yearly ?? ""}
                 onChange={(e) =>
                   updateDraft("stripe_price_id_yearly", e.target.value)
+                }
+              />
+            </Field>
+            <Field label="Max workspaces (-1 = unlimited)">
+              <Input
+                type="number"
+                value={draft.limits?.max_workspaces ?? 1}
+                onChange={(e) =>
+                  updateLimit("max_workspaces", Number(e.target.value))
                 }
               />
             </Field>
@@ -329,7 +338,7 @@ export function PacksManager() {
           </div>
           <div className="mt-4 flex gap-2">
             <Button
-              className="rounded-full"
+              className={cn("rounded-full", adminButtonPrimary)}
               disabled={saveMutation.isPending}
               onClick={handleSave}
             >
@@ -341,7 +350,7 @@ export function PacksManager() {
             </Button>
             <Button
               variant="outline"
-              className="rounded-full"
+              className={cn("rounded-full", adminButtonOutline)}
               onClick={() => {
                 setEditingId(null);
                 setDraft({});
@@ -373,7 +382,7 @@ export function PacksManager() {
           >
             <div>
               <p className="text-sm font-medium text-aria-text">{pack.name}</p>
-              <p className="text-xs text-aria-text-muted">{pack.slug}</p>
+              <p className="text-xs text-aria-text-secondary">{pack.slug}</p>
             </div>
             <span className="font-mono text-sm text-aria-text">
               ${Number(pack.price_monthly).toFixed(0)}
@@ -388,7 +397,7 @@ export function PacksManager() {
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-full"
+                className={cn("rounded-full", adminButtonOutline)}
                 onClick={() => startEdit(pack)}
               >
                 Edit

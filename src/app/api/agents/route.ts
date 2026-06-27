@@ -10,6 +10,7 @@ import {
   getUserAgentLimit,
   getUserVoiceEnabled,
 } from "@/lib/billing/limits";
+import { canCreateAgent } from "@/lib/billing/limit-enforcer";
 import {
   clampEnergyLimitForPlan,
   getPlanEnergyLimits,
@@ -17,9 +18,11 @@ import {
 import {
   getConnectedToolkitSlugs,
 } from "@/lib/composio/agent-toolkits";
+import { getComposioScope } from "@/lib/composio/scope";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 function toSlug(name: string): string {
   return (
@@ -32,7 +35,7 @@ function toSlug(name: string): string {
   );
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -46,11 +49,13 @@ export async function GET() {
     return Response.json({ error: message }, { status: 500 });
   }
 
+  const ctx = await resolveWorkspaceContext(userId, { request: req });
+  const composioScope = getComposioScope(ctx);
   const supabase = getSupabaseAdmin();
   const { data: agents, error } = await supabase
     .from("agents")
     .select("*")
-    .eq("user_id", userId)
+    .eq("workspace_id", ctx.workspaceId)
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: true });
 
@@ -58,11 +63,12 @@ export async function GET() {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  const connectedToolkits = await getConnectedToolkitSlugs(userId).catch(
-    () => [] as string[]
-  );
-  const voiceAllowed = await getUserVoiceEnabled(userId);
-  const agentLimit = await getUserAgentLimit(userId);
+  const connectedToolkits = await getConnectedToolkitSlugs(
+    ctx.workspaceId,
+    composioScope
+  ).catch(() => [] as string[]);
+  const voiceAllowed = await getUserVoiceEnabled(ctx.ownerUserId);
+  const agentLimit = await getUserAgentLimit(ctx.ownerUserId);
   const uiAgents = (agents as DbAgent[]).map((a) =>
     dbAgentToUiAgent(a, 0, connectedToolkits, voiceAllowed)
   );
@@ -103,39 +109,30 @@ export async function POST(req: Request) {
     return Response.json({ error: message }, { status: 500 });
   }
 
+  const ctx = await resolveWorkspaceContext(userId, { request: req });
+  const composioScope = getComposioScope(ctx);
   const supabase = getSupabaseAdmin();
 
-  const agentLimit = await getUserAgentLimit(userId);
-  if (agentLimit >= 0) {
-    const { count } = await supabase
-      .from("agents")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId);
-
-    if ((count ?? 0) >= agentLimit) {
-      return Response.json(
-        {
-          error: `Agent limit reached (${agentLimit}). Upgrade your plan to create more agents.`,
-        },
-        { status: 403 }
-      );
-    }
+  const agentCheck = await canCreateAgent(ctx.workspaceId, ctx.ownerUserId);
+  if (!agentCheck.ok) {
+    return Response.json(agentCheck.error, { status: 403 });
   }
 
-  const voiceAllowed = await getUserVoiceEnabled(userId);
+  const voiceAllowed = await getUserVoiceEnabled(ctx.ownerUserId);
   if (!voiceAllowed) {
     draft.voice.enabled = false;
   }
 
-  const connectedSlugs = await getConnectedToolkitSlugs(userId).catch(
-    () => [] as string[]
-  );
+  const connectedSlugs = await getConnectedToolkitSlugs(
+    ctx.workspaceId,
+    composioScope
+  ).catch(() => [] as string[]);
   draft.tools.composio_apps = filterComposioAppsForConnected(
     draft.tools.composio_apps,
     connectedSlugs
   );
 
-  const planEnergy = await getPlanEnergyLimits(userId);
+  const planEnergy = await getPlanEnergyLimits(ctx.ownerUserId);
   draft.energy_limit_monthly = clampEnergyLimitForPlan(
     draft.energy_limit_monthly || planEnergy.defaultMonthly,
     planEnergy
@@ -143,7 +140,7 @@ export async function POST(req: Request) {
 
   const { data: agent, error } = await supabase
     .from("agents")
-    .insert(draftToDbRow(draft, userId, slug))
+    .insert(draftToDbRow(draft, ctx.userId, ctx.workspaceId, slug))
     .select("*")
     .single();
 
@@ -151,9 +148,10 @@ export async function POST(req: Request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  const connectedToolkits = await getConnectedToolkitSlugs(userId).catch(
-    () => [] as string[]
-  );
+  const connectedToolkits = await getConnectedToolkitSlugs(
+    ctx.workspaceId,
+    composioScope
+  ).catch(() => [] as string[]);
 
   const uiAgent = dbAgentToUiAgent(
     agent as DbAgent,

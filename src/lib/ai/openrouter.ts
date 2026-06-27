@@ -3,6 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import type { LanguageModel } from "ai";
 
 import { isFreeLlmModel, normalizeLlmModel } from "@/lib/agents/llm-models";
+import { getPlatformSecret, getPlatformSetting } from "@/lib/platform/config";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const PLACEHOLDER_KEY_PATTERN = /^(sk-or-xxx|xxx)$/i;
@@ -17,8 +18,8 @@ export function getOpenRouterRequestHeaders(): Record<string, string> {
   return headers;
 }
 
-export function getOpenRouterApiKey(): string {
-  const key = process.env.OPENROUTER_API_KEY?.trim();
+export async function getOpenRouterApiKey(): Promise<string> {
+  const key = (await getPlatformSecret("openrouter.api_key"))?.trim();
   if (!key || PLACEHOLDER_KEY_PATTERN.test(key)) {
     throw new Error(
       "Your Ai credits are not sufficient. Please add more credits to your account."
@@ -27,38 +28,43 @@ export function getOpenRouterApiKey(): string {
   return key;
 }
 
+export async function getOpenRouterModels() {
+  return {
+    primary: (await getPlatformSetting("openrouter.model")) ?? "openai/gpt-4o",
+    fast: (await getPlatformSetting("openrouter.model_fast")) ?? "openai/gpt-4o-mini",
+    fallback:
+      (await getPlatformSetting("openrouter.model_fallback"))?.trim() ||
+      "cohere/north-mini-code:free",
+    longContext:
+      (await getPlatformSetting("openrouter.model_long")) ?? "anthropic/claude-sonnet-4",
+    embedding:
+      (await getPlatformSetting("openrouter.embedding_model")) ??
+      "openai/text-embedding-3-small",
+    stt: (await getPlatformSetting("openrouter.stt_model")) ?? "openai/whisper-large-v3",
+    tts: (await getPlatformSetting("openrouter.tts_model")) ?? "sesame/csm-1b",
+  };
+}
+
 /** Vercel AI SDK provider configured for OpenRouter */
-export function createOpenRouterProvider() {
+export async function createOpenRouterProvider() {
   return createOpenRouter({
-    apiKey: getOpenRouterApiKey(),
+    apiKey: await getOpenRouterApiKey(),
     headers: getOpenRouterRequestHeaders(),
   });
 }
 
 /** LangChain chat model via OpenRouter */
-export function createOpenRouterChatModel(model?: string) {
+export async function createOpenRouterChatModel(model?: string) {
+  const models = await getOpenRouterModels();
   return new ChatOpenAI({
-    model: model ?? process.env.OPENROUTER_MODEL ?? "openai/gpt-4o",
-    apiKey: getOpenRouterApiKey(),
+    model: model ?? models.primary,
+    apiKey: await getOpenRouterApiKey(),
     configuration: {
       baseURL: OPENROUTER_BASE_URL,
       defaultHeaders: getOpenRouterRequestHeaders(),
     },
   });
 }
-
-export const openRouterModels = {
-  primary: process.env.OPENROUTER_MODEL ?? "openai/gpt-4o",
-  fast: process.env.OPENROUTER_MODEL_FAST ?? "openai/gpt-4o-mini",
-  /** Used when paid credits are exhausted (must be a :free or zero-cost model). */
-  fallback:
-    process.env.OPENROUTER_MODEL_FALLBACK?.trim() ||
-    "cohere/north-mini-code:free",
-  longContext:
-    process.env.OPENROUTER_MODEL_LONG ?? "anthropic/claude-sonnet-4",
-  embedding:
-    process.env.OPENROUTER_EMBEDDING_MODEL ?? "openai/text-embedding-3-small",
-} as const;
 
 interface OpenRouterCredits {
   total_credits: number;
@@ -68,8 +74,7 @@ interface OpenRouterCredits {
 let creditsCache: { data: OpenRouterCredits; fetchedAt: number } | null = null;
 let forceFallbackUntil = 0;
 
-function isFallbackEnabled(): boolean {
-  const fallback = openRouterModels.fallback;
+function isFallbackEnabled(fallback: string): boolean {
   return Boolean(fallback && fallback !== "none" && fallback !== "off");
 }
 
@@ -77,7 +82,7 @@ async function fetchOpenRouterCredits(): Promise<OpenRouterCredits | null> {
   try {
     const res = await fetch(`${OPENROUTER_BASE_URL}/credits`, {
       headers: {
-        Authorization: `Bearer ${getOpenRouterApiKey()}`,
+        Authorization: `Bearer ${await getOpenRouterApiKey()}`,
         ...getOpenRouterRequestHeaders(),
       },
       cache: "no-store",
@@ -134,8 +139,11 @@ async function hasPaidCreditsRemaining(): Promise<boolean> {
   return credits.total_usage < credits.total_credits;
 }
 
-function buildChatModel(modelId: string, withOpenRouterFallback?: string): LanguageModel {
-  const provider = createOpenRouterProvider();
+function buildChatModel(
+  provider: ReturnType<typeof createOpenRouter>,
+  modelId: string,
+  withOpenRouterFallback?: string
+): LanguageModel {
   if (withOpenRouterFallback) {
     return provider.chat(modelId, { models: [withOpenRouterFallback] });
   }
@@ -150,38 +158,40 @@ export async function resolveAgentChatModel(
   preferredModelId?: string | null
 ): Promise<LanguageModel> {
   const modelId = normalizeLlmModel(preferredModelId);
-  const { fallback } = openRouterModels;
+  const { fallback } = await getOpenRouterModels();
+  const provider = await createOpenRouterProvider();
 
   if (isFreeLlmModel(modelId)) {
-    return buildChatModel(modelId);
+    return buildChatModel(provider, modelId);
   }
 
-  if (!isFallbackEnabled()) {
-    return buildChatModel(modelId);
+  if (!isFallbackEnabled(fallback)) {
+    return buildChatModel(provider, modelId);
   }
 
   if (await hasPaidCreditsRemaining()) {
-    return buildChatModel(modelId, fallback);
+    return buildChatModel(provider, modelId, fallback);
   }
 
   console.info(
     "[openrouter] paid credits exhausted, using free fallback instead of",
     modelId
   );
-  return buildChatModel(fallback);
+  return buildChatModel(provider, fallback);
 }
 
 /** Fast model for voice acks — same credit/fallback logic as agent chat. */
 export async function resolveFastChatModel(): Promise<LanguageModel> {
-  const { fast, fallback } = openRouterModels;
+  const { fast, fallback } = await getOpenRouterModels();
+  const provider = await createOpenRouterProvider();
 
-  if (!isFallbackEnabled()) {
-    return buildChatModel(fast);
+  if (!isFallbackEnabled(fallback)) {
+    return buildChatModel(provider, fast);
   }
 
   if (await hasPaidCreditsRemaining()) {
-    return buildChatModel(fast, fallback);
+    return buildChatModel(provider, fast, fallback);
   }
 
-  return buildChatModel(fallback);
+  return buildChatModel(provider, fallback);
 }

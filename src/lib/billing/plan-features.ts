@@ -14,6 +14,10 @@ export interface PlanFeature {
 export function getPackFeatures(limits: PackLimits): PlanFeature[] {
   return [
     {
+      label: `${formatPlanLimit(limits.max_workspaces)} workspaces`,
+      included: true,
+    },
+    {
       label: `${formatPlanLimit(limits.max_agents)} AI agents`,
       included: true,
     },

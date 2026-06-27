@@ -1,21 +1,27 @@
+import { getPlatformSetting } from "@/lib/platform/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 import type { BillingCycle } from "@/lib/billing/types";
 
-const ENV_PRICE_MAP: Record<string, Record<BillingCycle, string | undefined>> = {
-  starter: {
-    monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY,
-    yearly: process.env.STRIPE_PRICE_STARTER_YEARLY,
-  },
-  pro: {
-    monthly: process.env.STRIPE_PRICE_PRO_MONTHLY,
-    yearly: process.env.STRIPE_PRICE_PRO_YEARLY,
-  },
-  business: {
-    monthly: process.env.STRIPE_PRICE_BUSINESS_MONTHLY,
-    yearly: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
-  },
-};
+async function getEnvPriceMap(): Promise<
+  Record<string, Record<BillingCycle, string | undefined>>
+> {
+  return {
+    starter: {
+      monthly: (await getPlatformSetting("stripe.price_starter_monthly")) ?? undefined,
+      yearly: (await getPlatformSetting("stripe.price_starter_yearly")) ?? undefined,
+    },
+    pro: {
+      monthly: (await getPlatformSetting("stripe.price_pro_monthly")) ?? undefined,
+      yearly: (await getPlatformSetting("stripe.price_pro_yearly")) ?? undefined,
+    },
+    business: {
+      monthly:
+        (await getPlatformSetting("stripe.price_business_monthly")) ?? undefined,
+      yearly: (await getPlatformSetting("stripe.price_business_yearly")) ?? undefined,
+    },
+  };
+}
 
 export async function getStripePriceId(
   slug: string,
@@ -37,7 +43,8 @@ export async function getStripePriceId(
 
   if (fromDb) return fromDb;
 
-  return ENV_PRICE_MAP[slug]?.[cycle] ?? null;
+  const envMap = await getEnvPriceMap();
+  return envMap[slug]?.[cycle] ?? null;
 }
 
 export async function buildPriceIdToSlugMap(): Promise<Map<string, string>> {
@@ -57,7 +64,8 @@ export async function buildPriceIdToSlugMap(): Promise<Map<string, string>> {
     }
   }
 
-  for (const [slug, cycles] of Object.entries(ENV_PRICE_MAP)) {
+  const envMap = await getEnvPriceMap();
+  for (const [slug, cycles] of Object.entries(envMap)) {
     for (const priceId of Object.values(cycles)) {
       if (priceId) map.set(priceId, slug);
     }

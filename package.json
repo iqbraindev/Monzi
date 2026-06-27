@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:reload-schema": "docker compose exec -T postgres psql -U postgres -d aria -c \"NOTIFY pgrst, 'reload schema';\" && docker compose restart postgrest supabase-api"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.69",

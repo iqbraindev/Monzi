@@ -1,7 +1,57 @@
 import { clerkClient } from "@clerk/nextjs/server";
 
-import { getStripe } from "@/lib/stripe/client";
+import { resolveSuperAdminRole } from "@/lib/auth/super-admin";
+import { getStripe, isStripeConfigured } from "@/lib/stripe/client";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  createWorkspaceForOwner,
+  ensureDefaultWorkspace,
+} from "@/lib/workspaces/service";
+
+/**
+ * Keeps Supabase + Clerk role in sync with SUPER_ADMIN_EMAIL.
+ * Changing .env alone does not update existing accounts without this.
+ */
+export async function syncSuperAdminRole(userId: string): Promise<boolean> {
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL?.trim();
+  if (!superAdminEmail) return false;
+
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
+  const email = user.emailAddresses[0]?.emailAddress;
+  if (!email) return false;
+
+  const targetRole = resolveSuperAdminRole(email);
+  const currentClerkRole = (user.publicMetadata?.role as string | undefined) ?? "user";
+
+  const supabase = getSupabaseAdmin();
+  const { data: dbUser } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const currentDbRole = dbUser?.role ?? "user";
+  const needsClerkUpdate = currentClerkRole !== targetRole;
+  const needsDbUpdate = dbUser != null && currentDbRole !== targetRole;
+
+  if (!needsClerkUpdate && !needsDbUpdate) return false;
+
+  if (needsDbUpdate) {
+    await supabase.from("users").update({ role: targetRole }).eq("id", userId);
+  }
+
+  if (needsClerkUpdate) {
+    await client.users.updateUserMetadata(userId, {
+      publicMetadata: {
+        ...user.publicMetadata,
+        role: targetRole,
+      },
+    });
+  }
+
+  return true;
+}
 
 /**
  * Ensures a Clerk user has a matching row in Supabase (and default resources).
@@ -16,7 +66,11 @@ export async function ensureSupabaseUser(userId: string): Promise<void> {
     .eq("id", userId)
     .maybeSingle();
 
-  if (existing) return;
+  if (existing) {
+    await syncSuperAdminRole(userId);
+    await ensureDefaultWorkspace(userId);
+    return;
+  }
 
   await provisionSupabaseUser(userId);
 }
@@ -30,8 +84,7 @@ async function provisionSupabaseUser(userId: string): Promise<void> {
     throw new Error("No email found for user");
   }
 
-  const isSuperAdmin = email === process.env.SUPER_ADMIN_EMAIL;
-  const role = isSuperAdmin ? "super_admin" : "user";
+  const role = resolveSuperAdminRole(email);
   const supabase = getSupabaseAdmin();
 
   const { error: userError } = await supabase.from("users").insert({
@@ -47,9 +100,9 @@ async function provisionSupabaseUser(userId: string): Promise<void> {
   }
 
   let stripeCustomerId: string | null = null;
-  if (process.env.STRIPE_SECRET_KEY) {
+  if (await isStripeConfigured()) {
     try {
-      const customer = await getStripe().customers.create({
+      const customer = await (await getStripe()).customers.create({
         email,
         metadata: { clerk_id: userId },
       });
@@ -97,20 +150,7 @@ async function provisionSupabaseUser(userId: string): Promise<void> {
     });
   }
 
-  const { data: existingAgent } = await supabase
-    .from("agents")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("is_default", true)
-    .maybeSingle();
-
-  if (!existingAgent) {
-    await supabase.from("agents").insert({
-      user_id: userId,
-      name: "Monzi",
-      slug: "aria",
-      role: "general_assistant",
-      is_default: true,
-    });
-  }
+  await createWorkspaceForOwner(userId, "My Workspace", { isDefault: true });
 }
+
+export { ensureDefaultWorkspace, createWorkspaceForOwner };

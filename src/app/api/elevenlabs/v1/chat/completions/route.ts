@@ -32,6 +32,9 @@ import {
   verifyVoiceSessionToken,
   type VoiceSessionPayload,
 } from "@/lib/voice/session-token";
+import { getElevenLabsCustomLlmSecret } from "@/lib/voice/elevenlabs";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
+import { getComposioScope } from "@/lib/composio/scope";
 import {
   sanitizeForSpeech,
   StreamingSpeechSanitizer,
@@ -52,9 +55,7 @@ const VOICE_EMPTY_FALLBACK =
   "Sorry, I wasn't able to get that information just now. Please try again.";
 const KEEPALIVE_MS = 1500;
 
-function verifyCustomLlmAuth(req: Request): boolean {
-  const secret = process.env.ELEVENLABS_CUSTOM_LLM_SECRET;
-  if (!secret) return false;
+async function verifyCustomLlmAuth(req: Request, secret: string): Promise<boolean> {
   const auth = req.headers.get("authorization");
   if (!auth?.startsWith("Bearer ")) return false;
   return auth.slice("Bearer ".length) === secret;
@@ -132,7 +133,7 @@ function streamSpokenResponseRaw(text: string, model = "monzi"): Response {
 }
 
 export async function POST(req: Request) {
-  const llmSecret = process.env.ELEVENLABS_CUSTOM_LLM_SECRET;
+  const llmSecret = await getElevenLabsCustomLlmSecret();
   if (!llmSecret) {
     return streamSpokenResponse(
       "Voice assistant is not configured on the server."
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
   const model = body.model ?? "monzi";
   const wantsStream = body.stream !== false;
 
-  if (!verifyCustomLlmAuth(req)) {
+  if (!(await verifyCustomLlmAuth(req, llmSecret))) {
     console.error(
       "[elevenlabs/v1/chat/completions] Bearer auth mismatch — run scripts/configure-elevenlabs-custom-llm.mjs"
     );
@@ -292,8 +293,14 @@ export async function POST(req: Request) {
         });
       }, KEEPALIVE_MS);
 
+      const workspaceCtx = await resolveWorkspaceContext(session.userId, {
+        request: req,
+      });
       const ctx = await prepareAgentTurn({
-        userId: session.userId,
+        userId: workspaceCtx.userId,
+        workspaceId: workspaceCtx.workspaceId,
+        ownerUserId: workspaceCtx.ownerUserId,
+        composioScope: getComposioScope(workspaceCtx),
         agentId: session.agentId,
         conversationId: session.conversationId,
       });

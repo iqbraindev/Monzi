@@ -1,13 +1,18 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { assignToolkitToAgents } from "@/lib/composio/agent-toolkits";
+import { getComposioScope } from "@/lib/composio/scope";
 import { listActiveConnections } from "@/lib/composio/tools";
+import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const ctx = await resolveWorkspaceContext(userId, { request: req });
+  const composioScope = getComposioScope(ctx);
 
   const body = (await req.json()) as {
     toolkit?: string;
@@ -17,7 +22,10 @@ export async function POST(req: Request) {
 
   try {
     if (body.syncAll) {
-      const connections = await listActiveConnections(userId);
+      const connections = await listActiveConnections(
+        ctx.workspaceId,
+        composioScope
+      );
       const toolkits = [
         ...new Set(
           connections
@@ -27,7 +35,7 @@ export async function POST(req: Request) {
       ];
 
       for (const toolkit of toolkits) {
-        await assignToolkitToAgents(userId, toolkit, body.agentIds);
+        await assignToolkitToAgents(ctx.workspaceId, toolkit, body.agentIds);
       }
 
       return Response.json({ synced: toolkits });
@@ -38,7 +46,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "toolkit is required" }, { status: 400 });
     }
 
-    await assignToolkitToAgents(userId, toolkit, body.agentIds);
+    await assignToolkitToAgents(ctx.workspaceId, toolkit, body.agentIds);
     return Response.json({ synced: [toolkit] });
   } catch (err) {
     const message =

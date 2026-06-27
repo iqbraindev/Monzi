@@ -16,10 +16,12 @@ import {
   useRemoveAgentFromCache,
 } from "@/hooks/use-agents";
 import { useElevenLabsVoiceSession } from "@/hooks/use-elevenlabs-voice-session";
+import { useCallRingtone } from "@/hooks/use-call-ringtone";
 import { AppLogo } from "@/components/aria/integrations/integration-logo";
 import { AgentAvatar } from "@/components/aria/agent-avatar";
 import { cn } from "@/lib/utils";
 import { writeVoiceModePreference } from "@/lib/voice/preferences";
+import { unlockBrowserAudio } from "@/lib/voice/unlock-audio";
 import type { Agent } from "@/lib/aria/types";
 
 const CALL_GREEN = "#70D46B";
@@ -85,6 +87,8 @@ export function AgentCard({ agent }: { agent: Agent }) {
     voiceEnabledOnAgent: agent.voice.enabled,
   });
 
+  useCallRingtone(callActive && voiceState === "connecting");
+
   useEffect(() => {
     if (!menuOpen) return;
     const onClick = (e: MouseEvent) => {
@@ -136,6 +140,7 @@ export function AgentCard({ agent }: { agent: Agent }) {
 
   const startCall = () => {
     if (!canUseLiveVoice || callActive) return;
+    unlockBrowserAudio();
     setCallActive(true);
     void beginVoiceSession();
   };

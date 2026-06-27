@@ -234,6 +234,11 @@ export function useElevenLabsVoiceSession({
       });
 
       conversationRef.current = conversation;
+      try {
+        conversation.setVolume({ volume: 1 });
+      } catch {
+        // ignore
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Voice connection failed";

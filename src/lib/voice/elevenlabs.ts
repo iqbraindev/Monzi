@@ -57,6 +57,10 @@ function buildVoicePrompt(agent: DbAgent): string {
   return `You are ${agent.name}, a voice assistant for Monzi.`;
 }
 
+export function buildVoiceGreeting(agent: DbAgent): string {
+  return `Hey! I'm ${agent.name}. Need me to help with anything?`;
+}
+
 /**
  * ElevenLabs voice ids are ~20-char opaque strings (e.g. "cjVigY5qzO86Huf0OWal"),
  * not human names like legacy OpenAI presets stored on some agents.
@@ -81,8 +85,7 @@ export function buildVoiceOverrides(agent: DbAgent): VoiceOverrides {
   const overrides: VoiceOverrides = {
     agent: {
       prompt: { prompt: buildVoicePrompt(agent) },
-      // Empty — Monzi custom LLM speaks the one-time intro; prevents EL replay on empty LLM responses.
-      firstMessage: "",
+      firstMessage: buildVoiceGreeting(agent),
       language,
     },
   };

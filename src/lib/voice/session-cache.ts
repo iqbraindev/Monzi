@@ -80,6 +80,11 @@ export function markVoiceIntroSpoken(conversationId: string): boolean {
   return true;
 }
 
+/** Allows the welcome line to play again on the next voice call. */
+export function resetVoiceIntro(conversationId: string): void {
+  introSpokenFor.delete(conversationId);
+}
+
 export function getInFlightVoiceTurnResult(
   key: string
 ): Promise<string> | undefined {

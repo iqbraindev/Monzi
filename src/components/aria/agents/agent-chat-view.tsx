@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Agent } from "@/lib/aria/types";
 import { writeVoiceModePreference } from "@/lib/voice/preferences";
+import { unlockBrowserAudio } from "@/lib/voice/unlock-audio";
 
 export interface ChatHistoryProps {
   agent: Agent;
@@ -255,6 +256,7 @@ export function AgentChatView({
 
   const openVoicePanel = () => {
     if (!canUseVoice) return;
+    unlockBrowserAudio();
     setVoicePanelOpen(true);
     void beginVoiceSession();
   };

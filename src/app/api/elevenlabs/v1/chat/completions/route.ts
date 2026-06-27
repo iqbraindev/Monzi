@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import { appendVoiceConversationGuidance } from "@/lib/agents/build-system-prompt";
 import {
-  loadAgentForUser,
   loadConversationUiMessages,
   persistUserMessage,
   prepareAgentTurn,
@@ -180,14 +179,8 @@ export async function POST(req: Request) {
   }
 
   if (incoming.length === 0 || !latestUser) {
-    if (markVoiceIntroSpoken(session.conversationId)) {
-      const agent = await loadAgentForUser(session.userId, session.agentId);
-      if (agent) {
-        return streamSpokenResponse(
-          `Hi, I'm ${agent.name}. How can I help you today?`
-        );
-      }
-    }
+    // Greeting is spoken via ElevenLabs firstMessage override — stay silent here.
+    markVoiceIntroSpoken(session.conversationId);
     return streamSpokenResponseRaw(" ");
   }
 

@@ -17,6 +17,7 @@ import {
 import {
   cacheVoiceContext,
   registerVoiceSession,
+  resetVoiceIntro,
 } from "@/lib/voice/session-cache";
 import { createVoiceSessionToken } from "@/lib/voice/session-token";
 
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
     });
 
     registerVoiceSession({ userId, agentId, conversationId });
+    resetVoiceIntro(conversationId);
 
     // Pre-warm agent + Composio tools so the custom LLM responds within ElevenLabs' timeout.
     const ctx = await prepareAgentTurn({ userId, agentId, conversationId });

@@ -4,11 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  ChevronLeft,
+  Activity,
+  History,
   Mic,
   Paperclip,
-  PanelRight,
-  Check,
   Send,
   Square,
   MessageSquarePlus,
@@ -20,7 +19,12 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 
 import { AssistantMessage, UserMessage } from "@/components/aria/agents/chat-message";
 import { ChatErrorNotice } from "@/components/aria/agents/chat-error-notice";
-import { AppLogo } from "@/components/aria/integrations/integration-logo";
+import { AgentActivitiesModal } from "@/components/aria/agents/agent-activities-modal";
+import { AgentConversationList } from "@/components/aria/agents/agent-conversation-list";
+import {
+  ConnectedAppIcon,
+  capabilityForApp,
+} from "@/components/aria/agents/connected-app-icon";
 import { AgentAvatar } from "@/components/aria/agent-avatar";
 import {
   isComposioTool,
@@ -29,6 +33,10 @@ import {
 } from "@/components/aria/agents/tool-call-card";
 import { useElevenLabsVoiceSession } from "@/hooks/use-elevenlabs-voice-session";
 import {
+  useAgentConversations,
+  useInvalidateAgentConversations,
+} from "@/hooks/use-agent-conversations";
+import {
   VoiceHologramOverlay,
   type VoiceOverlayPhase,
 } from "@/components/aria/voice/voice-hologram-overlay";
@@ -36,6 +44,15 @@ import { cn } from "@/lib/utils";
 import type { Agent } from "@/lib/aria/types";
 import { writeVoiceModePreference } from "@/lib/voice/preferences";
 import { unlockBrowserAudio } from "@/lib/voice/unlock-audio";
+
+const CALL_GREEN = "#70D46B";
+const HANGUP_RED = "#F25C54";
+
+const CALL_BTN =
+  "flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-white transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40";
+
+const NEW_CHAT_BTN =
+  "flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#EAEAEA] text-[#333333] transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40";
 
 export interface ChatHistoryProps {
   agent: Agent;
@@ -112,6 +129,14 @@ export function AgentChatView({
   );
   const [startingNewChat, setStartingNewChat] = useState(false);
   const [voicePanelOpen, setVoicePanelOpen] = useState(false);
+  const [activitiesOpen, setActivitiesOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [switchingConvoId, setSwitchingConvoId] = useState<string | null>(null);
+  const [loadingThread, setLoadingThread] = useState(false);
+
+  const { data: conversations = [], isLoading: convosLoading } =
+    useAgentConversations(agent.id);
+  const invalidateConversations = useInvalidateAgentConversations();
 
   const transport = useMemo(
     () =>
@@ -129,7 +154,6 @@ export function AgentChatView({
     });
 
   const [draft, setDraft] = useState("");
-  const [contextOpen, setContextOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const voiceRefreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
@@ -172,7 +196,6 @@ export function AgentChatView({
 
   const {
     voiceEnabled,
-    setVoiceEnabled,
     beginVoiceSession,
     disconnect,
     canUseVoice,
@@ -307,12 +330,61 @@ export function AgentChatView({
       const data = (await res.json()) as { conversationId: string };
       setConversationId(data.conversationId);
       setMessages([]);
+      invalidateConversations(agent.id);
     } catch {
       // keep current conversation on failure
     } finally {
       setStartingNewChat(false);
     }
   };
+
+  const selectConversation = async (id: string) => {
+    if (id === conversationId || switchingConvoId || isStreaming) return;
+    setSwitchingConvoId(id);
+    setLoadingThread(true);
+    try {
+      const res = await fetch(
+        `/api/chat/${agent.id}/history?conversationId=${id}`
+      );
+      if (!res.ok) throw new Error("Failed to load thread");
+      const data = (await res.json()) as {
+        conversationId: string | null;
+        messages: UIMessage[];
+      };
+      setConversationId(data.conversationId);
+      setMessages(data.messages ?? []);
+    } catch {
+      window.alert("Could not load this chat thread.");
+    } finally {
+      setSwitchingConvoId(null);
+      setLoadingThread(false);
+    }
+  };
+
+  const handleThreadDeleted = (deletedId: string) => {
+    invalidateConversations(agent.id);
+    if (deletedId !== conversationId) return;
+
+    const remaining = conversations.filter((c) => c.id !== deletedId);
+    if (remaining[0]) {
+      void selectConversation(remaining[0].id);
+    } else {
+      setConversationId(null);
+      setMessages([]);
+    }
+  };
+
+  const prevStatus = useRef(status);
+  useEffect(() => {
+    if (
+      prevStatus.current !== "ready" &&
+      status === "ready" &&
+      conversationId
+    ) {
+      invalidateConversations(agent.id);
+    }
+    prevStatus.current = status;
+  }, [status, conversationId, agent.id, invalidateConversations]);
 
   const lastUserText = [...messages]
     .reverse()
@@ -332,14 +404,22 @@ export function AgentChatView({
         onEndCall={endVoiceCall}
       />
 
+      <AgentActivitiesModal
+        open={activitiesOpen}
+        onClose={() => setActivitiesOpen(false)}
+        dashActions={dashActions}
+        toolActions={toolActions}
+      />
+
       <aside className="flex w-[280px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-aria-border-subtle bg-aria-surface/50 px-[18px] py-[22px] backdrop-blur-sm max-lg:hidden">
-        <Link
-          href="/agents"
-          className="inline-flex h-[30px] items-center gap-1.5 self-start rounded-full border border-aria-border bg-aria-elevated py-0 pr-3 pl-2 text-xs font-medium text-aria-text-secondary transition-colors hover:border-aria-border hover:text-aria-text"
+        <button
+          type="button"
+          onClick={() => setActivitiesOpen(true)}
+          className="inline-flex h-[30px] items-center gap-1.5 self-start rounded-full border border-aria-border bg-aria-elevated py-0 pr-3 pl-2 text-xs font-medium text-aria-text-secondary transition-colors hover:text-aria-text"
         >
-          <ChevronLeft className="size-[15px]" />
-          All agents
-        </Link>
+          <Activity className="size-[15px]" />
+          Activities
+        </button>
 
         <div className="relative flex flex-col items-center gap-2.5">
           <div
@@ -377,15 +457,13 @@ export function AgentChatView({
               </Link>
             </span>
           ) : (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {agent.apps.map((app) => (
-                <span
+                <ConnectedAppIcon
                   key={app.name}
-                  className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-aria-border bg-[#16161f] py-0 pr-2.5 pl-1.5 text-xs text-aria-text"
-                >
-                  <AppLogo app={app} size={20} radius={6} />
-                  {app.name}
-                </span>
+                  app={app}
+                  capability={capabilityForApp(app.name, agent.capabilities)}
+                />
               ))}
             </div>
           )}
@@ -409,70 +487,6 @@ export function AgentChatView({
             </div>
           )}
         </Section>
-
-        <Section title="Capabilities">
-          <div className="flex flex-col gap-1.5">
-            {agent.capabilities.map((c) => (
-              <span
-                key={c}
-                className="flex items-center gap-2.5 text-[13px] text-slate-300"
-              >
-                <Check className="size-3.5 shrink-0 text-aria-success" />
-                {c}
-              </span>
-            ))}
-          </div>
-        </Section>
-
-        <div
-          className={cn(
-            "mt-auto flex flex-col gap-2 rounded-xl border border-aria-border-subtle bg-[#16161f] px-3 py-2.5",
-            !canUseVoice && "opacity-60"
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2.5 text-[13px] font-medium text-aria-text">
-              <Mic className="size-4 text-aria-primary-light" />
-              Voice Mode
-            </span>
-            <button
-              onClick={() => setVoiceEnabled(!voiceEnabled)}
-              aria-label="Toggle voice mode"
-              disabled={!canUseVoice}
-              className={cn(
-                "flex h-6 w-[42px] items-center rounded-full p-0.5 transition-all",
-                voiceEnabled
-                  ? "aria-gradient justify-end"
-                  : "justify-start bg-aria-border",
-                !canUseVoice && "cursor-not-allowed"
-              )}
-            >
-              <span className="block size-5 rounded-full bg-white shadow" />
-            </button>
-          </div>
-          {!agent.voiceAllowed && (
-            <span className="text-[11px] text-aria-text-muted">
-              Upgrade to Starter to enable voice.
-            </span>
-          )}
-          {agent.voiceAllowed && !agent.voice.enabled && (
-            <span className="text-[11px] text-aria-text-muted">
-              Voice is turned off for this agent.
-            </span>
-          )}
-          {voiceEnabled && voiceConnected && (
-            <span className="text-[11px] text-aria-success">
-              {isSpeaking
-                ? "Speaking…"
-                : isListening
-                  ? "Listening…"
-                  : "Voice connected"}
-            </span>
-          )}
-          {voiceError && (
-            <span className="text-[11px] text-aria-danger">{voiceError}</span>
-          )}
-        </div>
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
@@ -494,8 +508,26 @@ export function AgentChatView({
           </div>
           <button
             type="button"
+            onClick={() => setActivitiesOpen(true)}
+            aria-label="Activities"
+            title="Activities"
+            className="flex size-[34px] items-center justify-center rounded-[9px] border border-aria-border bg-aria-elevated text-aria-text-secondary transition-colors hover:text-aria-text lg:hidden"
+          >
+            <Activity className="size-[17px]" />
+          </button>
+          <button
+            type="button"
             onClick={toggleLiveVoice}
             disabled={!canUseVoice || voiceState === "connecting"}
+            aria-label={
+              !canUseVoice
+                ? "Live voice unavailable"
+                : voiceEnabled && voiceConnected
+                  ? "End live voice session"
+                  : voicePanelOpen
+                    ? "End live voice session"
+                    : "Start live voice"
+            }
             title={
               !canUseVoice
                 ? agent.voiceAllowed
@@ -505,43 +537,43 @@ export function AgentChatView({
                   ? "End live voice session"
                   : "Start live voice — talk to your agent in real time"
             }
-            className={cn(
-              "ml-auto flex h-[34px] items-center gap-1.5 rounded-[9px] px-3 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50",
-              voiceEnabled && voiceConnected
-                ? "border border-aria-danger/40 bg-aria-danger/10 text-aria-danger hover:bg-aria-danger/15"
-                : voicePanelOpen
-                  ? "border border-aria-danger/40 bg-aria-danger/10 text-aria-danger hover:bg-aria-danger/15"
-                  : "aria-gradient text-white hover:brightness-110"
-            )}
+            className={cn("ml-auto", CALL_BTN)}
+            style={{
+              backgroundColor:
+                voicePanelOpen || (voiceEnabled && voiceConnected)
+                  ? HANGUP_RED
+                  : CALL_GREEN,
+            }}
           >
             {voiceState === "connecting" ? (
-              "Connecting…"
+              <Phone className="size-5 animate-pulse opacity-70" strokeWidth={2.25} />
             ) : voicePanelOpen || voiceEnabled ? (
-              <>
-                <PhoneOff className="size-4" />
-                End voice
-              </>
+              <PhoneOff className="size-5" strokeWidth={2.25} />
             ) : (
-              <>
-                <Phone className="size-4" />
-                Talk live
-              </>
+              <Phone className="size-5" strokeWidth={2.25} />
             )}
           </button>
           <button
+            type="button"
             onClick={startNewChat}
             disabled={startingNewChat || isStreaming}
-            className="flex h-[34px] items-center gap-1.5 rounded-[9px] border border-aria-border bg-aria-elevated px-3 text-xs font-medium text-aria-text-secondary transition-colors hover:text-aria-text disabled:opacity-50"
+            aria-label="New chat"
+            title="New chat"
+            className={NEW_CHAT_BTN}
           >
-            <MessageSquarePlus className="size-4" />
-            New chat
+            <MessageSquarePlus className="size-5" strokeWidth={2} />
           </button>
           <button
-            onClick={() => setContextOpen((c) => !c)}
-            aria-label="Toggle context panel"
-            className="flex size-[34px] items-center justify-center rounded-[9px] border border-aria-border bg-aria-elevated text-aria-text-secondary transition-colors hover:border-aria-border hover:text-aria-text"
+            type="button"
+            onClick={() => setHistoryOpen((open) => !open)}
+            aria-label="Toggle chat history"
+            title="Chat history"
+            className={cn(
+              "flex size-[34px] items-center justify-center rounded-[9px] border border-aria-border bg-aria-elevated text-aria-text-secondary transition-colors hover:text-aria-text xl:hidden",
+              historyOpen && "border-aria-primary/40 text-aria-primary-light"
+            )}
           >
-            <PanelRight className="size-[17px]" />
+            <History className="size-[17px]" />
           </button>
         </div>
 
@@ -549,7 +581,7 @@ export function AgentChatView({
           ref={scrollRef}
           className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6 pb-2"
         >
-          {historyLoading && (
+          {historyLoading || loadingThread ? (
             <div className="flex flex-col gap-3">
               {[1, 2, 3].map((i) => (
                 <div
@@ -558,9 +590,9 @@ export function AgentChatView({
                 />
               ))}
             </div>
-          )}
+          ) : null}
 
-          {!historyLoading && messages.length === 0 && (
+          {!historyLoading && !loadingThread && messages.length === 0 && (
             <div className="flex flex-col items-start gap-4">
               <div className="flex max-w-[82%] gap-2.5">
                 <AgentAvatar
@@ -579,16 +611,18 @@ export function AgentChatView({
                 <button
                   type="button"
                   onClick={openVoicePanel}
-                  className="aria-gradient inline-flex h-10 items-center gap-2 self-center rounded-full px-5 text-sm font-semibold text-white transition-all hover:brightness-110"
+                  aria-label="Talk live"
+                  className={cn("self-center", CALL_BTN)}
+                  style={{ backgroundColor: CALL_GREEN }}
                 >
-                  <Phone className="size-4" />
-                  Talk live
+                  <Phone className="size-5" strokeWidth={2.25} />
                 </button>
               )}
             </div>
           )}
 
           {!historyLoading &&
+            !loadingThread &&
             messages.map((msg) => {
               if (msg.role === "user") {
                 return <UserMessage key={msg.id} text={messageText(msg)} />;
@@ -722,47 +756,22 @@ export function AgentChatView({
         </div>
       </section>
 
-      {contextOpen && (
-        <aside className="flex w-[300px] shrink-0 flex-col gap-[22px] overflow-y-auto border-l border-aria-border-subtle bg-aria-surface/50 px-[18px] py-[22px] backdrop-blur-sm max-xl:hidden">
-          <Section title="Dashboard actions">
-            {dashActions.length === 0 ? (
-              <span className="text-xs text-aria-text-muted">
-                Dashboard changes will appear here.
-              </span>
-            ) : (
-              dashActions.map((act) => (
-                <Link
-                  key={act.label}
-                  href={act.href ?? "/dashboard"}
-                  className="flex items-center gap-2.5 rounded-xl border border-aria-primary/25 bg-aria-primary/8 px-3 py-2.5 transition-colors hover:bg-aria-primary/12"
-                >
-                  <span className="shrink-0 text-[15px]">{act.icon}</span>
-                  <span className="flex-1 text-xs leading-snug text-aria-text">
-                    {act.label}
-                  </span>
-                </Link>
-              ))
-            )}
-          </Section>
-
-          <Section title="Tool activity">
-            {toolActions.length === 0 ? (
-              <span className="text-xs text-aria-text-muted">
-                No related data yet.
-              </span>
-            ) : (
-              toolActions.map((act) => (
-                <div
-                  key={act.label}
-                  className="rounded-xl border border-aria-border-subtle bg-[#16161f] px-3 py-2 text-xs text-slate-300"
-                >
-                  {act.label}
-                </div>
-              ))
-            )}
-          </Section>
-        </aside>
-      )}
+      <aside
+        className={cn(
+          "flex w-[300px] shrink-0 flex-col overflow-hidden border-l border-aria-border-subtle bg-aria-surface/50 px-[18px] py-[22px] backdrop-blur-sm",
+          historyOpen ? "max-xl:flex" : "max-xl:hidden",
+          "xl:flex"
+        )}
+      >
+        <AgentConversationList
+          conversations={conversations}
+          activeConversationId={conversationId}
+          loading={convosLoading}
+          switchingId={switchingConvoId}
+          onSelect={(id) => void selectConversation(id)}
+          onDeleted={handleThreadDeleted}
+        />
+      </aside>
     </div>
   );
 }

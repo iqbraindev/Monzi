@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/store/ui-store";
 import { getAgent } from "@/lib/aria/mock-data";
-import { AgentOrb } from "@/components/aria/agent-orb";
+import { AgentAvatar } from "@/components/aria/agent-avatar";
 
 interface NavItem {
   label: string;
@@ -127,7 +127,13 @@ export function Sidebar() {
         {expanded && (
           <div className="flex flex-col gap-2.5 rounded-xl border border-aria-border bg-aria-elevated p-2.5">
             <div className="flex items-center gap-2.5">
-              <AgentOrb color={agent.color} size={34} breathe />
+              <AgentAvatar
+                assetId={agent.avatarAssetId}
+                color={agent.color}
+                size={34}
+                breathe
+                alt={agent.name}
+              />
               <span className="flex min-w-0 flex-col">
                 <span className="text-[13px] font-semibold text-aria-text">
                   {agent.name}

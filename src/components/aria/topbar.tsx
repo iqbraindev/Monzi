@@ -6,7 +6,7 @@ import { Menu, Search, Bell, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/store/ui-store";
 import { AGENTS, getAgent } from "@/lib/aria/mock-data";
-import { AgentOrb } from "@/components/aria/agent-orb";
+import { AgentAvatar } from "@/components/aria/agent-avatar";
 
 function AgentSwitcher() {
   const activeAgentId = useUIStore((s) => s.activeAgentId);
@@ -30,7 +30,12 @@ function AgentSwitcher() {
         onClick={() => setOpen((o) => !o)}
         className="flex h-[38px] items-center gap-2 rounded-full border border-aria-border bg-aria-surface py-0 pr-2 pl-1.5 transition-colors hover:border-aria-border hover:bg-aria-elevated"
       >
-        <AgentOrb color={agent.color} size={26} />
+        <AgentAvatar
+          assetId={agent.avatarAssetId}
+          color={agent.color}
+          size={26}
+          alt={agent.name}
+        />
         <span className="text-[13px] font-semibold text-aria-text">
           {agent.name}
         </span>
@@ -51,7 +56,12 @@ function AgentSwitcher() {
               }}
               className="flex w-full items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left transition-colors hover:bg-aria-subtle"
             >
-              <AgentOrb color={a.color} size={28} />
+              <AgentAvatar
+                assetId={a.avatarAssetId}
+                color={a.color}
+                size={28}
+                alt={a.name}
+              />
               <span className="flex min-w-0 flex-col">
                 <span className="text-[13px] font-semibold text-aria-text">
                   {a.name}

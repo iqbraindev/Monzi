@@ -166,6 +166,19 @@
   0%, 100% { transform: scale(1); opacity: 0.85; }
   50% { transform: scale(1.06); opacity: 1; }
 }
+@keyframes aria-launcher-neon {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 6px var(--launcher-glow, rgba(124, 58, 237, 0.35)))
+      drop-shadow(0 4px 18px rgba(0, 0, 0, 0.45));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 10px var(--launcher-glow, rgba(124, 58, 237, 0.42)))
+      drop-shadow(0 0 22px var(--launcher-glow-soft, rgba(124, 58, 237, 0.18)))
+      drop-shadow(0 4px 18px rgba(0, 0, 0, 0.45));
+  }
+}
 @keyframes aria-mesh {
   0% { transform: translate(0, 0) scale(1); }
   33% { transform: translate(4%, -3%) scale(1.08); }
@@ -232,6 +245,20 @@
 
 .aria-breathe { animation: aria-breathe 4s ease-in-out infinite; }
 .aria-float { animation: aria-float 6s ease-in-out infinite; }
+.agent-avatar-face {
+  object-fit: cover;
+  object-position: 50% var(--avatar-face-y, 6%);
+  transform: scale(var(--avatar-face-scale, 2.65));
+  transform-origin: 50% var(--avatar-face-origin-y, 11%);
+}
+.agent-launcher-avatar-multiply {
+  mix-blend-mode: multiply;
+  animation: aria-launcher-neon 4.5s ease-in-out infinite;
+}
+.agent-launcher-avatar-lighten {
+  mix-blend-mode: lighten;
+  animation: aria-launcher-neon 4.5s ease-in-out infinite;
+}
 .aria-slide-down { animation: aria-slide-down 0.4s ease; }
 .aria-slide-up { animation: aria-slide-up 0.3s ease; }
 .aria-slide-left { animation: aria-slide-left 0.25s ease; }

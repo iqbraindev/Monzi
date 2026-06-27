@@ -20,7 +20,7 @@ import {
   UserMessage,
 } from "@/components/aria/agents/chat-message";
 import { ToolCallCard, isDashboardTool } from "@/components/aria/agents/tool-call-card";
-import { AgentOrb } from "@/components/aria/agent-orb";
+import { AgentAvatar } from "@/components/aria/agent-avatar";
 import {
   VoiceHologramOverlay,
   type VoiceOverlayPhase,
@@ -358,7 +358,13 @@ function AgentSidePanelChat({
 
         {!historyLoading && messages.length === 0 && (
           <div className="flex max-w-[90%] gap-2 self-start">
-            <AgentOrb color={agent.color} size={28} breathe />
+            <AgentAvatar
+              assetId={agent.avatarAssetId}
+              color={agent.color}
+              size={28}
+              breathe
+              alt={agent.name}
+            />
             <div className="rounded-[16px_16px_16px_4px] border border-aria-border bg-aria-elevated/85 px-3 py-2.5 text-sm leading-relaxed text-aria-text">
               Hi! I&rsquo;m {agent.name}. Ask me to update your dashboard, pull
               data from connected apps, or answer questions.
@@ -406,7 +412,12 @@ function AgentSidePanelChat({
 
         {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex items-center gap-2 self-start">
-            <AgentOrb color={agent.color} size={28} />
+            <AgentAvatar
+              assetId={agent.avatarAssetId}
+              color={agent.color}
+              size={28}
+              alt={agent.name}
+            />
             <div className="flex gap-1.5 rounded-[16px] border border-aria-border bg-aria-elevated/85 px-3 py-2.5">
               <TypingDot delay="0s" />
               <TypingDot delay="0.2s" />
@@ -529,7 +540,13 @@ function PanelShell({
     >
       <div className="flex shrink-0 items-center gap-2 border-b border-aria-border px-4 py-3">
         {agent ? (
-          <AgentOrb color={agent.color} size={32} breathe />
+          <AgentAvatar
+            assetId={agent.avatarAssetId}
+            color={agent.color}
+            size={32}
+            breathe
+            alt={agent.name}
+          />
         ) : (
           <span className="size-8 rounded-full bg-aria-subtle" />
         )}

@@ -11,6 +11,7 @@ import {
   BuilderField,
   builderInputClass,
 } from "@/components/aria/agents/builder/agent-builder-shell";
+import { AvatarPicker } from "@/components/aria/agents/builder/fields/avatar-picker";
 import {
   clearAgentDraft,
   useAgentBuilderForm,
@@ -22,7 +23,6 @@ import {
 } from "@/hooks/use-agents";
 import { ROLE_PRESETS } from "@/lib/agents/presets";
 import { cn } from "@/lib/utils";
-import { AGENT_COLOR_OPTIONS } from "@/lib/agents/constants";
 
 export function QuickCreateForm() {
   const router = useRouter();
@@ -60,7 +60,7 @@ export function QuickCreateForm() {
   return (
     <AgentBuilderShell
       title="Quick create"
-      subtitle="Name, role, and color — customize everything else later."
+      subtitle="Name, role, and avatar — customize everything else later."
       limitBadge={limitBadge}
       preview={<AgentBuilderPreview draft={draft} />}
     >
@@ -98,27 +98,11 @@ export function QuickCreateForm() {
           </div>
         </BuilderField>
 
-        <BuilderField label="Color">
-          <div className="flex flex-wrap gap-2.5">
-            {AGENT_COLOR_OPTIONS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() =>
-                  updateDraft({
-                    avatar: { ...draft.avatar, primary_color: color },
-                  })
-                }
-                className={cn(
-                  "size-9 rounded-full transition-transform hover:scale-105",
-                  draft.avatar.primary_color === color &&
-                    "ring-2 ring-white ring-offset-2 ring-offset-aria-elevated"
-                )}
-                style={{ background: color }}
-              />
-            ))}
-          </div>
-        </BuilderField>
+        <AvatarPicker
+          draft={draft}
+          onChange={updateDraft}
+          showAccentColor={false}
+        />
 
         {error && <p className="text-sm text-aria-danger">{error}</p>}
 

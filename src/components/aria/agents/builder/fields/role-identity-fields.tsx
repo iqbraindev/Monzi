@@ -10,6 +10,7 @@ import {
   builderInputClass,
   builderTextareaClass,
 } from "@/components/aria/agents/builder/agent-builder-shell";
+import { AvatarPicker } from "@/components/aria/agents/builder/fields/avatar-picker";
 
 interface RoleFieldsProps {
   draft: AgentBuilderDraft;
@@ -211,67 +212,7 @@ export function IdentityFields({ draft, onChange }: IdentityFieldsProps) {
         />
       </BuilderField>
 
-      <BuilderField label="Color">
-        <div className="flex flex-wrap gap-2.5">
-          {["#7C3AED", "#06B6D4", "#10B981", "#F59E0B", "#F43F5E", "#6366F1"].map(
-            (color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() =>
-                  onChange({
-                    avatar: { ...draft.avatar, primary_color: color },
-                  })
-                }
-                aria-label={`Color ${color}`}
-                className={cn(
-                  "size-9 rounded-full transition-transform hover:scale-105",
-                  draft.avatar.primary_color === color &&
-                    "ring-2 ring-white ring-offset-2 ring-offset-aria-elevated"
-                )}
-                style={{ background: color }}
-              />
-            )
-          )}
-        </div>
-      </BuilderField>
-
-      <BuilderField label="Avatar style" hint="Visual style for your agent's orb">
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              { id: "avatar-01", label: "Classic", style: "lottie" as const },
-              { id: "avatar-05", label: "Minimal", style: "minimal" as const },
-              { id: "avatar-07", label: "Illustrated", style: "illustrated" as const },
-            ] as const
-          ).map((preset) => {
-            const active = draft.avatar.asset_id === preset.id;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() =>
-                  onChange({
-                    avatar: {
-                      ...draft.avatar,
-                      asset_id: preset.id,
-                      style: preset.style,
-                    },
-                  })
-                }
-                className={cn(
-                  "h-[34px] rounded-full border px-3.5 text-[13px] font-medium transition-all",
-                  active
-                    ? "border-aria-primary/40 bg-aria-primary/15 text-aria-text"
-                    : "border-aria-border bg-[#16161f] text-aria-text-secondary"
-                )}
-              >
-                {preset.label}
-              </button>
-            );
-          })}
-        </div>
-      </BuilderField>
+      <AvatarPicker draft={draft} onChange={onChange} />
     </div>
   );
 }

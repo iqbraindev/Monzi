@@ -2,6 +2,10 @@ export interface AppGlyph {
   glyph: string;
   color: string;
   name: string;
+  /** Composio toolkit slug for real brand logos. */
+  toolkitSlug?: string;
+  /** Foreground color for glyph fallback. */
+  fg?: string;
 }
 
 export interface AgentVoice {
@@ -15,8 +19,10 @@ export interface Agent {
   id: string;
   name: string;
   role: string;
-  /** Hex base color used for the agent's aura / avatar gradient. */
+  /** Hex base color used for the agent's aura / accents. */
   color: string;
+  /** Selected avatar asset id (e.g. avatar-01). */
+  avatarAssetId?: string;
   status: "active" | "inactive";
   conversations: number;
   lastActive: string;

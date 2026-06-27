@@ -2,12 +2,13 @@
 
 import { Phone, MicOff } from "lucide-react";
 
-import { AgentOrb } from "@/components/aria/agent-orb";
+import { AgentAvatar } from "@/components/aria/agent-avatar";
 import type { AgentBuilderDraft } from "@/lib/agents/form-types";
 import { getRolePreset } from "@/lib/agents/presets";
 import { getPersonalityTemplate } from "@/lib/agents/personality-templates";
 import { getLlmModelLabel } from "@/lib/agents/llm-models";
 import { getVoiceLabel } from "@/lib/voice/voice-options";
+import { ToolkitLogo } from "@/components/aria/integrations/integration-logo";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
 import { TOOLKIT_CATALOG } from "@/lib/composio/toolkits";
 import { cn } from "@/lib/utils";
@@ -59,7 +60,14 @@ export function AgentBuilderPreview({
         }}
       />
 
-      <AgentOrb color={color} size={64} breathe className="relative mb-0.5" />
+      <AgentAvatar
+        assetId={draft.avatar.asset_id}
+        color={color}
+        size={64}
+        breathe
+        className="relative mb-0.5"
+        alt={draft.name.trim() || "Agent preview"}
+      />
 
       <h3 className="relative font-heading text-lg font-bold text-aria-text">
         {draft.name.trim() || "Your agent"}
@@ -99,13 +107,8 @@ export function AgentBuilderPreview({
             const catalog = TOOLKIT_CATALOG[slug];
             if (!catalog) return null;
             return (
-              <span
-                key={slug}
-                title={catalog.name}
-                className="flex size-[26px] items-center justify-center rounded-[7px] font-heading text-[11px] font-bold text-white"
-                style={{ background: catalog.bg }}
-              >
-                {catalog.glyph}
+              <span key={slug} title={catalog.name}>
+                <ToolkitLogo slug={slug} size={26} radius={7} />
               </span>
             );
           })}

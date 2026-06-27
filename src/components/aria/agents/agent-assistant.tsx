@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { MessageCircle, X } from "lucide-react";
 
 import { AgentSidePanel } from "@/components/aria/agents/agent-side-panel";
-import { AgentOrb } from "@/components/aria/agent-orb";
+import { AgentAvatar } from "@/components/aria/agent-avatar";
 import { useAgents } from "@/hooks/use-agents";
 import {
   readStoredActiveAgentId,
@@ -69,27 +69,26 @@ export function AgentAssistant() {
         onClick={togglePanel}
         aria-label={panelOpen ? "Close agent" : "Open agent"}
         className={cn(
-          "aria-float fixed z-[56] flex size-14 items-center justify-center rounded-full text-white shadow-[0_8px_32px_rgba(124,58,237,0.45)] transition-all hover:scale-105 hover:brightness-110",
+          "aria-float fixed z-[56] transition-all",
           panelOpen
-            ? "bottom-6 right-[min(436px,calc(100vw-1.5rem))]"
-            : "bottom-6 right-6",
-          panelOpen ? "aria-gradient" : ""
-        )}
-        style={
-          panelOpen
-            ? undefined
+            ? "bottom-6 right-[min(436px,calc(100vw-1.5rem))] flex size-14 items-center justify-center rounded-full text-white shadow-[0_8px_32px_rgba(124,58,237,0.45)] hover:scale-105 hover:brightness-110 aria-gradient"
             : activeAgent
-              ? {
-                  background: `linear-gradient(135deg, ${activeAgent.color}, ${activeAgent.color}cc)`,
-                  boxShadow: `0 8px 32px ${activeAgent.color}66`,
-                }
-              : undefined
-        }
+              ? "bottom-0 right-3 flex items-end justify-center border-0 bg-transparent p-0 hover:scale-[1.03] hover:brightness-110"
+              : "bottom-6 right-6 flex size-14 items-center justify-center rounded-full text-white shadow-[0_8px_32px_rgba(124,58,237,0.45)] hover:scale-105 hover:brightness-110 aria-gradient"
+        )}
       >
         {panelOpen ? (
           <X className="size-6" />
         ) : activeAgent ? (
-          <AgentOrb color={activeAgent.color} size={36} />
+          <AgentAvatar
+            assetId={activeAgent.avatarAssetId}
+            color={activeAgent.color}
+            size={188}
+            breathe
+            neon
+            variant="full"
+            alt={`Chat with ${activeAgent.name}`}
+          />
         ) : (
           <MessageCircle className="size-6" />
         )}

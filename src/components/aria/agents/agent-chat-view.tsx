@@ -20,6 +20,8 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 
 import { AssistantMessage, UserMessage } from "@/components/aria/agents/chat-message";
 import { ChatErrorNotice } from "@/components/aria/agents/chat-error-notice";
+import { AppLogo } from "@/components/aria/integrations/integration-logo";
+import { AgentAvatar } from "@/components/aria/agent-avatar";
 import {
   isComposioTool,
   isDashboardTool,
@@ -32,7 +34,6 @@ import {
 } from "@/components/aria/voice/voice-hologram-overlay";
 import { cn } from "@/lib/utils";
 import type { Agent } from "@/lib/aria/types";
-import { agentGradient } from "@/lib/aria/mock-data";
 import { writeVoiceModePreference } from "@/lib/voice/preferences";
 
 export interface ChatHistoryProps {
@@ -132,8 +133,6 @@ export function AgentChatView({
   const voiceRefreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
-  const grad = agentGradient(agent.color);
-  const glow = `${agent.color}88`;
   const isStreaming = status === "streaming" || status === "submitted";
   const searchParams = useSearchParams();
   const pendingSend = searchParams.get("send");
@@ -194,7 +193,7 @@ export function AgentChatView({
   });
 
   const avatarAnimClass = cn(
-    "aria-breathe relative size-[84px] rounded-full",
+    "relative",
     isSpeaking && "scale-105",
     isListening && voiceConnected && "ring-2 ring-aria-primary/50 ring-offset-2 ring-offset-aria-base",
     voiceState === "connecting" && "animate-pulse"
@@ -347,9 +346,13 @@ export function AgentChatView({
               background: `radial-gradient(circle, ${agent.color}66, transparent 65%)`,
             }}
           />
-          <span
+          <AgentAvatar
+            assetId={agent.avatarAssetId}
+            color={agent.color}
+            size={84}
+            breathe
             className={avatarAnimClass}
-            style={{ background: grad, boxShadow: `0 0 32px ${glow}` }}
+            alt={agent.name}
           />
           <h2 className="mt-1.5 font-heading text-[22px] font-bold text-aria-text">
             {agent.name}
@@ -378,12 +381,7 @@ export function AgentChatView({
                   key={app.name}
                   className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-aria-border bg-[#16161f] py-0 pr-2.5 pl-1.5 text-xs text-aria-text"
                 >
-                  <span
-                    className="flex size-5 items-center justify-center rounded-md font-heading text-[10px] font-bold text-white"
-                    style={{ background: app.color }}
-                  >
-                    {app.glyph}
-                  </span>
+                  <AppLogo app={app} size={20} radius={6} />
                   {app.name}
                 </span>
               ))}
@@ -477,9 +475,11 @@ export function AgentChatView({
 
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-[60px] shrink-0 items-center gap-2.5 border-b border-aria-border-subtle bg-aria-base/40 px-5">
-          <span
-            className="size-[34px] rounded-full"
-            style={{ background: grad, boxShadow: `0 0 14px ${glow}` }}
+          <AgentAvatar
+            assetId={agent.avatarAssetId}
+            color={agent.color}
+            size={34}
+            alt={agent.name}
           />
           <div className="flex flex-col">
             <span className="font-heading text-[15px] font-semibold text-aria-text">
@@ -561,9 +561,12 @@ export function AgentChatView({
           {!historyLoading && messages.length === 0 && (
             <div className="flex flex-col items-start gap-4">
               <div className="flex max-w-[82%] gap-2.5">
-                <span
-                  className="mt-0.5 size-[30px] shrink-0 rounded-full"
-                  style={{ background: grad, boxShadow: `0 0 12px ${glow}` }}
+                <AgentAvatar
+                  assetId={agent.avatarAssetId}
+                  color={agent.color}
+                  size={30}
+                  className="mt-0.5"
+                  alt={agent.name}
                 />
                 <div className="rounded-[18px_18px_18px_4px] border border-aria-border bg-aria-elevated/85 px-[15px] py-3 text-sm leading-relaxed text-aria-text">
                   Hi! I&rsquo;m {agent.name}. Ask me anything — I can use your
@@ -605,9 +608,12 @@ export function AgentChatView({
                     />
                   ))}
                   <div className="flex gap-2.5">
-                    <span
-                      className="mt-0.5 size-[30px] shrink-0 rounded-full"
-                      style={{ background: grad, boxShadow: `0 0 12px ${glow}` }}
+                    <AgentAvatar
+                      assetId={agent.avatarAssetId}
+                      color={agent.color}
+                      size={30}
+                      className="mt-0.5"
+                      alt={agent.name}
                     />
                     <div className="rounded-[18px_18px_18px_4px] border border-aria-border bg-aria-elevated/85 px-[15px] py-3">
                       <AssistantMessage
@@ -625,9 +631,11 @@ export function AgentChatView({
 
           {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
             <div className="flex items-center gap-2.5 self-start">
-              <span
-                className="size-[30px] shrink-0 rounded-full"
-                style={{ background: grad, boxShadow: `0 0 12px ${glow}` }}
+              <AgentAvatar
+                assetId={agent.avatarAssetId}
+                color={agent.color}
+                size={30}
+                alt={agent.name}
               />
               <div className="flex gap-1.5 rounded-[18px_18px_18px_4px] border border-aria-border bg-aria-elevated/85 px-4 py-3.5">
                 <Dot delay="0s" />

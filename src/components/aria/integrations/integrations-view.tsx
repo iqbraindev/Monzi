@@ -13,6 +13,7 @@ import {
   agentGradient,
 } from "@/lib/aria/mock-data";
 import type { Integration } from "@/lib/aria/types";
+import { IntegrationLogo } from "@/components/aria/integrations/integration-logo";
 import { catalogIntegrations } from "@/lib/composio/toolkits";
 import { useAgents, useInvalidateAgents } from "@/hooks/use-agents";
 import {
@@ -220,7 +221,7 @@ export function IntegrationsView() {
                 >
                   <div className="pointer-events-none absolute -top-[40%] -right-[20%] size-32 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.18),transparent_65%)] blur-2xl" />
                   <div className="relative flex items-center gap-2.5">
-                    <LogoTile app={app} size={38} />
+                    <IntegrationLogo app={app} size={38} />
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="text-sm font-semibold text-aria-text">
                         {app.name}
@@ -291,7 +292,7 @@ export function IntegrationsView() {
               className="flex flex-col gap-2.5 rounded-2xl border border-aria-border bg-aria-surface/70 p-4 backdrop-blur-md transition-transform hover:-translate-y-1"
             >
               <div className="flex items-start gap-2.5">
-                <LogoTile app={app} size={40} />
+                <IntegrationLogo app={app} size={40} />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-semibold text-aria-text">
@@ -339,7 +340,7 @@ export function IntegrationsView() {
             className="w-full max-w-[440px] overflow-hidden rounded-[20px] border border-aria-border bg-aria-elevated/97 shadow-[0_24px_80px_rgba(0,0,0,0.6)]"
           >
             <div className="flex items-center gap-3 border-b border-aria-border px-[22px] pt-[22px] pb-[18px]">
-              <LogoTile app={modalApp} size={46} radius={12} />
+              <IntegrationLogo app={modalApp} size={46} radius={12} />
               <div className="min-w-0 flex-1">
                 <div className="font-heading text-[17px] font-semibold text-aria-text">
                   Connect {modalApp.name}
@@ -485,31 +486,5 @@ export function IntegrationsView() {
         </div>
       )}
     </div>
-  );
-}
-
-function LogoTile({
-  app,
-  size,
-  radius = 10,
-}: {
-  app: Integration;
-  size: number;
-  radius?: number;
-}) {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center font-heading font-bold"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius,
-        background: app.bg,
-        color: app.fg,
-        fontSize: size * 0.42,
-      }}
-    >
-      {app.glyph}
-    </span>
   );
 }

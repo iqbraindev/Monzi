@@ -17,12 +17,12 @@ export const AGENT_COLOR_OPTIONS = [
 ] as const;
 
 export const AGENT_AVATAR_PRESETS = [
-  { id: "avatar-01", label: "Nova", style: "lottie" as const },
-  { id: "avatar-02", label: "Pulse", style: "lottie" as const },
-  { id: "avatar-03", label: "Orbit", style: "lottie" as const },
-  { id: "avatar-04", label: "Spark", style: "lottie" as const },
-  { id: "avatar-05", label: "Flux", style: "minimal" as const },
-  { id: "avatar-06", label: "Echo", style: "minimal" as const },
+  { id: "avatar-01", label: "Nova", style: "illustrated" as const },
+  { id: "avatar-02", label: "Pulse", style: "illustrated" as const },
+  { id: "avatar-03", label: "Orbit", style: "illustrated" as const },
+  { id: "avatar-04", label: "Spark", style: "illustrated" as const },
+  { id: "avatar-05", label: "Flux", style: "illustrated" as const },
+  { id: "avatar-06", label: "Echo", style: "illustrated" as const },
   { id: "avatar-07", label: "Prism", style: "illustrated" as const },
   { id: "avatar-08", label: "Aura", style: "illustrated" as const },
 ] as const;

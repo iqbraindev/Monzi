@@ -54,7 +54,9 @@ function toolkitsToGlyphs(toolkits: string[]): AppGlyph[] {
       return {
         glyph: catalog.glyph,
         color: catalog.bg,
+        fg: catalog.fg,
         name: catalog.name,
+        toolkitSlug: slug,
       };
     })
     .filter((g): g is AppGlyph => g !== null);
@@ -91,6 +93,7 @@ export function dbAgentToUiAgent(
     name: agent.name,
     role: agent.role.replace(/_/g, " "),
     color,
+    avatarAssetId: agent.avatar?.asset_id,
     status: agent.is_active ? "active" : "inactive",
     conversations: conversationCount,
     lastActive: formatLastActive(agent.updated_at),

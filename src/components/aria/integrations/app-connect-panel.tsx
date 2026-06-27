@@ -11,6 +11,7 @@ import {
   DEFAULT_INTEGRATION_PERMISSIONS,
   INTEGRATION_PERMISSIONS,
 } from "@/lib/aria/mock-data";
+import { IntegrationLogo } from "@/components/aria/integrations/integration-logo";
 import type { Integration } from "@/lib/aria/types";
 import { catalogIntegrations } from "@/lib/composio/toolkits";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
@@ -184,7 +185,7 @@ export function AppConnectPanel({
                 )}
               >
                 <div className="flex items-start gap-2.5">
-                  <LogoTile app={app} size={36} />
+                  <IntegrationLogo app={app} size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm font-semibold text-aria-text">
@@ -241,7 +242,7 @@ export function AppConnectPanel({
             className="w-full max-w-[420px] overflow-hidden rounded-[20px] border border-aria-border bg-aria-elevated/97 shadow-[0_24px_80px_rgba(0,0,0,0.6)]"
           >
             <div className="flex items-center gap-3 border-b border-aria-border px-5 py-4">
-              <LogoTile app={modalApp} size={40} />
+              <IntegrationLogo app={modalApp} size={40} />
               <div className="flex-1 font-heading text-base font-semibold text-aria-text">
                 Connect {modalApp.name}
               </div>
@@ -293,29 +294,5 @@ export function AppConnectPanel({
         </div>
       )}
     </div>
-  );
-}
-
-function LogoTile({
-  app,
-  size,
-}: {
-  app: Integration;
-  size: number;
-}) {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center font-heading font-bold"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 10,
-        background: app.bg,
-        color: app.fg,
-        fontSize: size * 0.42,
-      }}
-    >
-      {app.glyph}
-    </span>
   );
 }

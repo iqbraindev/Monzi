@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
-import { AgentOrb } from "@/components/aria/agent-orb";
+import { AgentAvatar } from "@/components/aria/agent-avatar";
 import { cn } from "@/lib/utils";
 import type { Agent } from "@/lib/aria/types";
 
@@ -51,7 +51,12 @@ export function AgentSelector({
         onClick={() => setOpen((o) => !o)}
         className="flex h-9 max-w-full items-center gap-2 rounded-full border border-aria-border bg-aria-surface py-0 pr-2 pl-1.5 transition-colors hover:bg-aria-elevated disabled:opacity-60"
       >
-        <AgentOrb color={selected.color} size={24} />
+        <AgentAvatar
+          assetId={selected.avatarAssetId}
+          color={selected.color}
+          size={24}
+          alt={selected.name}
+        />
         <span className="truncate text-[13px] font-semibold text-aria-text">
           {selected.name}
         </span>
@@ -78,7 +83,12 @@ export function AgentSelector({
                 agent.id === selected.id && "bg-aria-primary/10"
               )}
             >
-              <AgentOrb color={agent.color} size={28} />
+              <AgentAvatar
+                assetId={agent.avatarAssetId}
+                color={agent.color}
+                size={28}
+                alt={agent.name}
+              />
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-[13px] font-semibold text-aria-text">
                   {agent.name}

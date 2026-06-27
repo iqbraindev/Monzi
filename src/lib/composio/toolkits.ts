@@ -181,12 +181,31 @@ export const TOOLKIT_CATALOG: Record<
   },
 };
 
+/** Composio CDN slugs that differ from internal toolkit slugs. */
+const LOGO_SLUG_OVERRIDES: Record<string, string> = {
+  googleanalytics: "google_analytics",
+};
+
+export function toolkitLogoUrl(toolkitSlug: string): string {
+  const logoSlug = LOGO_SLUG_OVERRIDES[toolkitSlug] ?? toolkitSlug;
+  return `https://logos.composio.dev/api/${logoSlug}`;
+}
+
 export function toolkitFromIntegrationName(name: string): string | undefined {
   return INTEGRATION_TOOLKIT_MAP[name];
 }
 
 export function integrationNameFromToolkit(slug: string): string {
   return TOOLKIT_CATALOG[slug]?.name ?? slug;
+}
+
+export function integrationFromToolkitSlug(
+  slug: string,
+  connected = false
+): Integration | null {
+  const meta = TOOLKIT_CATALOG[slug];
+  if (!meta) return null;
+  return { ...meta, toolkitSlug: slug, connected };
 }
 
 export function catalogIntegrations(): Integration[] {

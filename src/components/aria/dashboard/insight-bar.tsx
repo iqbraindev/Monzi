@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { useUIStore } from "@/lib/store/ui-store";
 import { useDashboardStore } from "@/lib/store/dashboard-store";
 import { getAgent } from "@/lib/aria/mock-data";
-import { AgentOrb } from "@/components/aria/agent-orb";
+import { AgentAvatar } from "@/components/aria/agent-avatar";
 
 export function InsightBar() {
   const dismissed = useDashboardStore((s) => s.insightDismissed);
@@ -17,7 +17,13 @@ export function InsightBar() {
 
   return (
     <div className="aria-slide-down mx-6 mt-4 shrink-0 flex items-center gap-3.5 rounded-2xl border border-aria-primary/30 bg-aria-primary/10 px-3.5 py-3 backdrop-blur-sm">
-      <AgentOrb color={agent.color} size={34} breathe />
+      <AgentAvatar
+        assetId={agent.avatarAssetId}
+        color={agent.color}
+        size={34}
+        breathe
+        alt={agent.name}
+      />
       <span className="min-w-0 flex-1 text-sm leading-normal text-aria-text">
         <strong className="font-semibold text-aria-primary-light">
           {agent.name}:

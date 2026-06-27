@@ -60,7 +60,7 @@ export const DEFAULT_AGENT_BUILDER_DRAFT: AgentBuilderDraft = {
   role: "",
   description: "",
   avatar: {
-    style: "lottie",
+    style: "illustrated",
     asset_id: "avatar-01",
     primary_color: "#6366F1",
     background_color: "#1e1b4b",

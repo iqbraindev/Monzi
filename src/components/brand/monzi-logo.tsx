@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ComponentPropsWithoutRef, CSSProperties } from "react";
 
 import logoMozi from "@/assets/logo-mozi.png";
+import monziIcon from "@/assets/monzi-icon.png";
 import { cn } from "@/lib/utils";
 
 /** Bundled asset — Next.js hashes the URL when the file changes. */
@@ -103,5 +104,5 @@ export function MonziLogo({
   return image;
 }
 
-/** For metadata / favicon — same hashed URL as the in-app logo. */
-export const MONZI_LOGO_ICON = logoMozi.src;
+/** Square mark for metadata / favicon / apple touch icon. */
+export const MONZI_LOGO_ICON = monziIcon.src;

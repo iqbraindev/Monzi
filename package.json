@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:migrate:011": "docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d aria -f /migrations/011_subaccount_workspace_permissions.sql",
+    "db:migrate:012": "powershell -Command \"Get-Content supabase/migrations/012_composio_catalog_apps.sql | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d aria\"",
     "db:reload-schema": "docker compose exec -T postgres psql -U postgres -d aria -c \"NOTIFY pgrst, 'reload schema';\" && docker compose restart postgrest supabase-api"
   },
   "dependencies": {

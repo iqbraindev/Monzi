@@ -19,13 +19,19 @@ const isOnboardingRoute = createRouteMatcher(["/onboarding(.*)"]);
 const isSubaccountBlocked = createRouteMatcher([
   "/billing(.*)",
   "/subaccounts(.*)",
+  "/integrations(.*)",
   "/api/admin(.*)",
 ]);
-const isAuthRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const isAuthRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/sso-callback(.*)",
+]);
 const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/sso-callback(.*)",
   "/api/webhooks(.*)",
   "/api/health(.*)",
   "/api/composio/callback(.*)",

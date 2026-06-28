@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { EMAILS } from "@/lib/aria/mock-data";
 import type { EmailItem } from "@/lib/aria/types";
 import {
   WidgetBadge,
@@ -16,24 +15,24 @@ import {
   WidgetLoadingState,
 } from "@/components/aria/dashboard/widget-data-states";
 import { EmailDetailModal } from "@/components/aria/dashboard/email-detail-modal";
+import { useWidgetConnection } from "@/hooks/use-widget-connection";
 import { useWidgetData } from "@/hooks/use-widget-data";
 
 export function EmailWidget() {
   const queryClient = useQueryClient();
+  const { toolkit, connected, isLoading: connLoading } = useWidgetConnection("email");
   const { data, isLoading, error, refetch, isError } = useWidgetData<{
     emails: EmailItem[];
-  }>("email");
+  }>("email", { enabled: connected });
 
   const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
 
   const emails = data?.emails ?? [];
-  const isLive = emails.length > 0;
-  const displayEmails =
-    !isLoading && !isError && isLive ? emails : !isLoading && !isError ? EMAILS : [];
-  const unread = isLive ? emails.filter((e) => e.unread).length : 0;
+  const unread = emails.filter((e) => e.unread).length;
   const notConnected =
-    isError &&
-    (error as Error & { code?: string })?.code === "NOT_CONNECTED";
+    (!connLoading && !connected) ||
+    (isError &&
+      (error as Error & { code?: string })?.code === "NOT_CONNECTED");
 
   const handleMarkedRead = useCallback(
     (messageId: string) => {
@@ -67,12 +66,12 @@ export function EmailWidget() {
         title="Inbox"
         span="lg:col-span-5"
         badge={
-          isLive ? (
+          connected && unread > 0 ? (
             <WidgetBadge tone="primary">{unread} unread</WidgetBadge>
           ) : undefined
         }
         footer={
-          !notConnected && !isLoading && isLive ? (
+          connected && !notConnected && !isLoading && emails.length > 0 ? (
             <div className="flex items-center justify-between px-4 py-3">
               <a className="cursor-pointer text-[13px] text-aria-text-secondary hover:text-aria-text">
                 View all emails
@@ -84,27 +83,31 @@ export function EmailWidget() {
           ) : undefined
         }
       >
-        {isLoading && <WidgetLoadingState />}
-        {notConnected && (
+        {(connLoading || (connected && isLoading)) && <WidgetLoadingState />}
+        {notConnected && toolkit && (
           <WidgetConnectCta
-            toolkit="gmail"
+            toolkit={toolkit}
             label="Connect Gmail to see your live inbox."
           />
         )}
-        {isError && !notConnected && (
+        {connected && isError && !notConnected && (
           <WidgetErrorState
             message={error?.message ?? "Could not load emails"}
             onRetry={() => void refetch()}
           />
         )}
-        {!isLoading && !isError && isLive && emails.length === 0 && (
-          <div className="p-6 text-center text-sm text-aria-text-muted">
-            No emails to show.
-          </div>
-        )}
-        {!isLoading &&
+        {connected &&
+          !isLoading &&
           !isError &&
-          displayEmails.map((m) => (
+          emails.length === 0 && (
+            <div className="p-6 text-center text-sm text-aria-text-muted">
+              No emails to show.
+            </div>
+          )}
+        {connected &&
+          !isLoading &&
+          !isError &&
+          emails.map((m) => (
             <button
               key={m.id}
               type="button"
@@ -146,9 +149,9 @@ export function EmailWidget() {
 
       <EmailDetailModal
         email={selectedEmail}
-        live={isLive}
+        live={connected && emails.length > 0}
         onClose={() => setSelectedEmail(null)}
-        onMarkedRead={isLive ? handleMarkedRead : undefined}
+        onMarkedRead={connected ? handleMarkedRead : undefined}
       />
     </>
   );

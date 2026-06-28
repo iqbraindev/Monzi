@@ -7,6 +7,10 @@ import { getRegistryEntry } from "@/lib/dashboard/widget-registry";
 import { broadcastWidgetCreated } from "@/lib/dashboard/broadcast";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import {
+  assertMemberCanMutate,
+  memberAccessDeniedResponse,
+} from "@/lib/rbac/member-access";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function POST(
@@ -21,6 +25,12 @@ export async function POST(
 
     await ensureSupabaseUser(userId);
     const ctx = await resolveWorkspaceContext(userId, { request: req });
+
+    try {
+      assertMemberCanMutate(ctx);
+    } catch (err) {
+      return memberAccessDeniedResponse(err);
+    }
 
     const { id: dashboardId } = await params;
     const body = (await req.json()) as { type?: string; title?: string };
@@ -63,6 +73,7 @@ export async function POST(
       title: body.title ?? reg.defaultTitle,
       composioScope: getComposioScope(ctx),
       createdBy: "user",
+      skipConnectionCheck: true,
     });
 
     await broadcastWidgetCreated(ctx.workspaceId, dashboardId, widget);

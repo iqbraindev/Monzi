@@ -13,7 +13,7 @@ import {
 } from "@/lib/aria/mock-data";
 import { IntegrationLogo } from "@/components/aria/integrations/integration-logo";
 import type { Integration } from "@/lib/aria/types";
-import { catalogIntegrations } from "@/lib/composio/toolkits";
+import { useComposioCatalog } from "@/hooks/use-composio-catalog";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
 import { getRolePreset } from "@/lib/agents/presets";
 import { DRAFT_STORAGE_KEY } from "@/lib/agents/form-types";
@@ -42,6 +42,7 @@ export function AppConnectPanel({
   onDraftPersist,
 }: AppConnectPanelProps) {
   const { data: connections = [], isLoading } = useComposioConnections();
+  const { data: catalogApps = [], isLoading: catalogLoading } = useComposioCatalog();
   const invalidate = useInvalidateComposioConnections();
   const [modalApp, setModalApp] = useState<Integration | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -79,7 +80,7 @@ export function AppConnectPanel({
     : [];
 
   const catalog = useMemo(() => {
-    const all = catalogIntegrations().map((app) => ({
+    const all = catalogApps.map((app) => ({
       ...app,
       connected: connectedSlugs.has(app.toolkitSlug ?? ""),
       suggested: suggested.has(app.toolkitSlug ?? ""),
@@ -89,7 +90,7 @@ export function AppConnectPanel({
       if (a.connected !== b.connected) return a.connected ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
-  }, [connectedSlugs, suggested]);
+  }, [catalogApps, connectedSlugs, suggested]);
 
   const startConnect = useCallback(
     async (app: Integration) => {
@@ -166,7 +167,7 @@ export function AppConnectPanel({
         <span className="sr-only">App list below</span>
       </BuilderField>
 
-      {isLoading ? (
+      {isLoading || catalogLoading ? (
         <p className="text-sm text-aria-text-muted">Loading connections…</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

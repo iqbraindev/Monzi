@@ -101,11 +101,10 @@ export function WidgetPicker() {
             <button
               key={w.id}
               type="button"
-              disabled={!w.connected || adding === w.id}
+              disabled={adding === w.id}
               onClick={() => void addWidget(w.id, w.name)}
               className={cn(
-                "flex flex-col gap-2 rounded-2xl border border-aria-border bg-aria-surface/60 p-3.5 text-left transition-all hover:border-aria-primary hover:bg-aria-primary/8 disabled:cursor-not-allowed",
-                !w.connected && "opacity-55"
+                "flex flex-col gap-2 rounded-2xl border border-aria-border bg-aria-surface/60 p-3.5 text-left transition-all hover:border-aria-primary hover:bg-aria-primary/8 disabled:cursor-not-allowed disabled:opacity-60"
               )}
             >
               <div className="flex items-center gap-2.5">
@@ -132,7 +131,7 @@ export function WidgetPicker() {
                   ? "Adding…"
                   : w.connected
                     ? "+ Add widget"
-                    : w.connectLabel}
+                    : "+ Add widget · connect app inside"}
               </span>
             </button>
           ))}

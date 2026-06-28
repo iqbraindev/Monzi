@@ -1,69 +1,90 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { AuthPromoPanel } from "@/components/auth/auth-promo-panel";
+
 type AuthShellProps = {
   title: string;
+  subtitle: string;
   children: ReactNode;
-  panel: {
-    heading: string;
-    description: string;
-    ctaLabel: string;
-    ctaHref: string;
+  footerLink: {
+    prompt: string;
+    linkLabel: string;
+    href: string;
   };
 };
 
-export function AuthShell({ title, children, panel }: AuthShellProps) {
+export function AuthShell({
+  title,
+  subtitle,
+  children,
+  footerLink,
+}: AuthShellProps) {
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
-      <section className="flex flex-1 flex-col justify-center bg-[#eef1f6] px-8 py-12 sm:px-12 lg:px-16 xl:px-24">
-        <div className="mx-auto w-full max-w-md">
-          <h1 className="mb-8 text-center font-[family-name:var(--font-sora)] text-3xl font-bold tracking-tight text-[#1a1a2e] sm:text-4xl">
-            {title}
-          </h1>
+    <div className="relative min-h-screen bg-aria-base text-aria-text">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_20%_-10%,rgba(124,58,237,0.18),transparent)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_90%_100%,rgba(6,182,212,0.08),transparent)]"
+        aria-hidden
+      />
 
-          <div className="auth-form">{children}</div>
-
-          <p className="mt-6 text-center text-sm text-[#9ca3af] lg:hidden">
-            {panel.description}{" "}
+      <div className="relative flex min-h-screen flex-col lg:flex-row">
+        <section className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 lg:px-16 xl:px-20">
+          <div className="mx-auto w-full max-w-[420px]">
             <Link
-              href={panel.ctaHref}
-              className="font-medium text-[#1a4d3e] underline-offset-4 hover:underline"
+              href="/"
+              className="mb-8 inline-block font-heading text-lg font-bold tracking-tight text-aria-text transition-colors hover:text-aria-primary-light"
             >
-              {panel.ctaLabel}
+              Monzi
             </Link>
-          </p>
-        </div>
-      </section>
 
-      <aside className="relative hidden min-h-[320px] flex-1 overflow-hidden lg:flex lg:min-h-screen">
-        <div
-          className="absolute inset-0 scale-110 bg-cover bg-center"
-          style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1400&q=80')",
-          }}
-          aria-hidden
-        />
-        <div
-          className="absolute inset-0 bg-linear-to-br from-[#1a0a0a]/80 via-[#2d1218]/75 to-[#0f1a2e]/85 backdrop-blur-[2px]"
-          aria-hidden
-        />
+            <h1 className="font-heading text-3xl font-bold tracking-tight text-aria-text sm:text-4xl">
+              {title}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-aria-text-secondary">
+              {subtitle}
+            </p>
 
-        <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-12 text-center text-white">
-          <h2 className="font-[family-name:var(--font-sora)] text-4xl font-bold tracking-tight sm:text-5xl">
-            {panel.heading}
-          </h2>
-          <p className="mt-4 max-w-sm text-base leading-relaxed text-white/85">
-            {panel.description}
-          </p>
-          <Link
-            href={panel.ctaHref}
-            className="mt-10 inline-flex h-12 min-w-[180px] items-center justify-center rounded-full border-2 border-white px-8 text-sm font-semibold tracking-wide text-white transition-colors hover:bg-white/10"
-          >
-            {panel.ctaLabel}
-          </Link>
-        </div>
-      </aside>
+            <div
+              className="auth-card mt-8 rounded-2xl border border-aria-border bg-aria-surface/80 p-6 shadow-xl shadow-black/20 backdrop-blur-sm sm:p-7"
+            >
+              {children}
+            </div>
+
+            <p className="mt-5 text-center text-sm text-aria-text-muted">
+              {footerLink.prompt}{" "}
+              <Link
+                href={footerLink.href}
+                className="font-medium text-aria-primary-light underline-offset-4 hover:underline"
+              >
+                {footerLink.linkLabel}
+              </Link>
+            </p>
+          </div>
+        </section>
+
+        <aside
+          className="relative hidden min-h-screen flex-1 flex-col overflow-hidden border-l border-aria-border/60 bg-aria-surface/40 lg:flex"
+        >
+          <div
+            className="pointer-events-none absolute inset-0 bg-linear-to-br from-[#1a1033]/90 via-aria-surface/95 to-aria-base"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -right-20 top-20 size-64 rounded-full bg-aria-primary/20 blur-3xl"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -left-10 bottom-32 size-48 rounded-full bg-aria-accent/15 blur-3xl"
+            aria-hidden
+          />
+
+          <AuthPromoPanel />
+        </aside>
+      </div>
     </div>
   );
 }

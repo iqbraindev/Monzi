@@ -25,6 +25,16 @@ export interface DashboardToolsContext {
   conversationId?: string;
 }
 
+function connectionNote(
+  workspaceId: string,
+  type: string,
+  composioScope: ComposioScopeOptions
+): Promise<string> {
+  return assertWidgetConnection(workspaceId, type, composioScope).then((check) =>
+    check.ok ? "" : " Connect the app in Integrations to see live data."
+  );
+}
+
 export function getDashboardTools(ctx: DashboardToolsContext) {
   const supabase = getSupabaseAdmin();
 
@@ -69,15 +79,6 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
           return "Which dashboard should I add this to? List the user's dashboards or ask them to name one — I can create a new dashboard if they provide a name.";
         }
 
-        const connectionCheck = await assertWidgetConnection(
-          ctx.workspaceId,
-          params.type,
-          ctx.composioScope
-        );
-        if (!connectionCheck.ok) {
-          return connectionCheck.message;
-        }
-
         let dashboard: Awaited<ReturnType<typeof resolveDashboard>> = null;
         try {
           dashboard = await resolveDashboard(supabase, ctx.workspaceId, {
@@ -103,6 +104,7 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
           title: params.title,
           size: params.size,
           composioScope: ctx.composioScope,
+          skipConnectionCheck: true,
           dataSource: {
             integration: params.integration ?? baseSource.integration,
             composio_tool: params.composio_tool ?? baseSource.composio_tool,
@@ -132,7 +134,12 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
 
         await broadcastWidgetCreated(ctx.workspaceId, dashboard.id, widget);
 
-        return `Widget "${params.title}" has been added to the "${dashboard.name}" dashboard.`;
+        const note = await connectionNote(
+          ctx.workspaceId,
+          params.type,
+          ctx.composioScope
+        );
+        return `Widget "${params.title}" has been added to the "${dashboard.name}" dashboard.${note}`;
       },
     }),
 
@@ -164,16 +171,19 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
         });
 
         const widgets: Awaited<ReturnType<typeof createWidget>>[] = [];
+        const needsConnection: string[] = [];
+
         for (let i = 0; i < params.widgets.length; i++) {
           const w = params.widgets[i];
-          const connectionCheck = await assertWidgetConnection(
+          const check = await assertWidgetConnection(
             ctx.workspaceId,
             w.type,
             ctx.composioScope
           );
-          if (!connectionCheck.ok) {
-            throw new Error(connectionCheck.message);
+          if (!check.ok) {
+            needsConnection.push(w.title);
           }
+
           widgets.push(
             await createWidget(supabase, {
               workspaceId: ctx.workspaceId,
@@ -182,6 +192,7 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
               title: w.title,
               size: w.size,
               composioScope: ctx.composioScope,
+              skipConnectionCheck: true,
               layout: {
                 x: (i % 2) * 6,
                 y: Math.floor(i / 2) * 4,
@@ -204,7 +215,11 @@ export function getDashboardTools(ctx: DashboardToolsContext) {
 
         await broadcastDashboardCreated(ctx.workspaceId, dashboard, widgets, true);
 
-        return `I've created the "${params.name}" dashboard with ${widgets.length} widget(s) and switched you to it.`;
+        let message = `I've created the "${params.name}" dashboard with ${widgets.length} widget(s) and switched you to it.`;
+        if (needsConnection.length > 0) {
+          message += ` These widgets need app connections for live data: ${needsConnection.join(", ")}. The user can connect apps from Integrations or inside each widget.`;
+        }
+        return message;
       },
     }),
   };

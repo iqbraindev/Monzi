@@ -64,49 +64,52 @@ export function DashboardTabs() {
 
   return (
     <div className="shrink-0">
-      <div className="flex items-center gap-1 overflow-x-auto px-6 pt-4 pb-1">
-        {dashboards.map((tab) => {
-          const active = tab.id === activeDashboardId;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveDashboard(tab.id)}
-              className={cn(
-                "flex h-[38px] items-center gap-1.5 border-b-2 px-3.5 text-sm whitespace-nowrap transition-colors",
-                active
-                  ? "border-aria-primary font-semibold text-aria-text"
-                  : "border-transparent font-medium text-aria-text-secondary hover:text-aria-text"
-              )}
-            >
-              <span>{tab.created_by === "agent" ? "✨" : tab.icon ?? "📊"}</span>
-              <span>{tab.name}</span>
-            </button>
-          );
-        })}
-        <button
-          onClick={() => setCreateModalOpen(true)}
-          className="ml-2 flex h-[30px] items-center gap-1.5 rounded-full border border-dashed border-aria-border px-3 text-[13px] font-medium whitespace-nowrap text-aria-text-secondary transition-colors hover:border-aria-primary hover:text-aria-primary-light"
-        >
-          <Plus className="size-3.5" />
-          New dashboard
-        </button>
-        <button
-          onClick={() => setPickerOpen(true)}
-          disabled={!hasActive}
-          className="ml-1 flex h-[30px] items-center gap-1.5 rounded-full border border-dashed border-aria-border px-3 text-[13px] font-medium whitespace-nowrap text-aria-text-secondary transition-colors hover:border-aria-primary hover:text-aria-primary-light disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          <Plus className="size-3.5" />
-          Add widget
-        </button>
+      <div className="flex items-center gap-3 px-6 pt-4 pb-1">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {dashboards.map((tab) => {
+            const active = tab.id === activeDashboardId;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveDashboard(tab.id)}
+                className={cn(
+                  "flex h-[38px] items-center gap-1.5 border-b-2 px-3.5 text-sm whitespace-nowrap transition-colors",
+                  active
+                    ? "border-aria-primary font-semibold text-aria-text"
+                    : "border-transparent font-medium text-aria-text-secondary hover:text-aria-text"
+                )}
+              >
+                <span>{tab.created_by === "agent" ? "✨" : tab.icon ?? "📊"}</span>
+                <span>{tab.name}</span>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="ml-2 flex h-[30px] items-center gap-1.5 rounded-full border border-dashed border-aria-border px-3 text-[13px] font-medium whitespace-nowrap text-aria-text-secondary transition-colors hover:border-aria-primary hover:text-aria-primary-light"
+          >
+            <Plus className="size-3.5" />
+            New dashboard
+          </button>
+          <button
+            onClick={() => setPickerOpen(true)}
+            disabled={!hasActive}
+            className="ml-1 flex h-[30px] items-center gap-1.5 rounded-full border border-dashed border-aria-border px-3 text-[13px] font-medium whitespace-nowrap text-aria-text-secondary transition-colors hover:border-aria-primary hover:text-aria-primary-light disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Plus className="size-3.5" />
+            Add widget
+          </button>
+        </div>
         {activeDashboard && (
           <button
             type="button"
             onClick={() => void handleDeleteDashboard()}
             disabled={deleting}
-            className="ml-1 flex h-[30px] items-center gap-1.5 rounded-full border border-aria-border px-3 text-[13px] font-medium whitespace-nowrap text-aria-text-secondary transition-colors hover:border-aria-danger/40 hover:bg-aria-danger/10 hover:text-aria-danger disabled:opacity-50"
+            title="Delete the current dashboard"
+            aria-label="Delete the current dashboard"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-aria-danger/35 text-aria-danger transition-colors hover:border-aria-danger/60 hover:bg-aria-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Trash2 className="size-3.5" />
-            {deleting ? "Deleting…" : "Delete dashboard"}
+            <Trash2 className="size-4" />
           </button>
         )}
       </div>

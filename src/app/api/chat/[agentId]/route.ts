@@ -11,6 +11,7 @@ import { formatAiErrorMessage } from "@/lib/ai/user-facing-errors";
 import { getRedisOptional } from "@/lib/redis/optional";
 import { ensureSupabaseUser } from "@/lib/users/provision";
 import { getComposioScope } from "@/lib/composio/scope";
+import { assertMemberCanUseAgent, memberAccessDeniedResponse } from "@/lib/rbac/member-access";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export const maxDuration = 60;
@@ -29,6 +30,13 @@ export async function POST(
     const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const { agentId } = await params;
+
+    try {
+      await assertMemberCanUseAgent(ctx, agentId);
+    } catch (err) {
+      return memberAccessDeniedResponse(err);
+    }
+
     const {
       messages,
       conversationId: requestedConversationId,

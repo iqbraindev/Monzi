@@ -1,6 +1,5 @@
 "use client";
 
-import { PIPELINE } from "@/lib/aria/mock-data";
 import type { PipelineStage } from "@/lib/aria/types";
 import { WidgetShell } from "@/components/aria/dashboard/widget-shell";
 import {
@@ -8,17 +7,22 @@ import {
   WidgetErrorState,
   WidgetLoadingState,
 } from "@/components/aria/dashboard/widget-data-states";
+import { useWidgetConnection } from "@/hooks/use-widget-connection";
 import { useWidgetData } from "@/hooks/use-widget-data";
 
 export function PipelineWidget() {
+  const { toolkit, connected, isLoading: connLoading } =
+    useWidgetConnection("pipeline");
   const { data, isLoading, error, refetch, isError } = useWidgetData<{
     stages: PipelineStage[];
-  }>("pipeline");
+  }>("pipeline", { enabled: connected });
 
-  const stages = data?.stages?.length ? data.stages : PIPELINE;
+  const stages = data?.stages ?? [];
+  const dealCount = stages.reduce((n, s) => n + s.count, 0);
   const notConnected =
-    isError &&
-    (error as Error & { code?: string })?.code === "NOT_CONNECTED";
+    (!connLoading && !connected) ||
+    (isError &&
+      (error as Error & { code?: string })?.code === "NOT_CONNECTED");
 
   return (
     <WidgetShell
@@ -27,25 +31,32 @@ export function PipelineWidget() {
       title="Pipeline"
       span="lg:col-span-6"
       actions={
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-aria-warning/15 px-2.5 py-1 text-xs font-semibold text-aria-warning">
-          {stages.reduce((n, s) => n + s.count, 0)} deals
-        </span>
+        connected && !notConnected && stages.length > 0 ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-aria-warning/15 px-2.5 py-1 text-xs font-semibold text-aria-warning">
+            {dealCount} deals
+          </span>
+        ) : undefined
       }
     >
-      {isLoading && <WidgetLoadingState />}
-      {notConnected && (
+      {(connLoading || (connected && isLoading)) && <WidgetLoadingState />}
+      {notConnected && toolkit && (
         <WidgetConnectCta
-          toolkit="hubspot"
+          toolkit={toolkit}
           label="Connect HubSpot to see your pipeline."
         />
       )}
-      {isError && !notConnected && (
+      {connected && isError && !notConnected && (
         <WidgetErrorState
           message={error?.message ?? "Could not load pipeline"}
           onRetry={() => void refetch()}
         />
       )}
-      {!isLoading && !notConnected && !isError && (
+      {connected && !isLoading && !notConnected && !isError && stages.length === 0 && (
+        <div className="flex flex-1 items-center justify-center p-6 text-sm text-aria-text-muted">
+          No pipeline data yet.
+        </div>
+      )}
+      {connected && !isLoading && !notConnected && !isError && stages.length > 0 && (
         <div className="grid flex-1 grid-cols-2 gap-2.5 p-4 sm:grid-cols-4">
           {stages.map((s) => (
             <div key={s.stage} className="flex flex-col gap-2">

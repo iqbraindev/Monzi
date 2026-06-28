@@ -5,8 +5,8 @@ interface WidgetShellProps {
   logo: string;
   logoColor: string;
   title: string;
-  /** Tailwind column span on the 12-col grid, e.g. "lg:col-span-5". */
-  span: string;
+  /** @deprecated Grid layout controls sizing; kept for call-site compatibility. */
+  span?: string;
   badge?: React.ReactNode;
   actions?: React.ReactNode;
   footer?: React.ReactNode;
@@ -19,7 +19,6 @@ export function WidgetShell({
   logo,
   logoColor,
   title,
-  span,
   badge,
   actions,
   footer,
@@ -30,30 +29,31 @@ export function WidgetShell({
   return (
     <section
       className={cn(
-        "aria-glass col-span-12 flex flex-col overflow-hidden rounded-2xl",
-        span,
+        "aria-glass flex h-full w-full flex-col overflow-hidden rounded-2xl",
         className
       )}
     >
       <div
         className={cn(
-          "flex items-center gap-2.5 border-b border-aria-border-subtle px-4 py-3.5",
+          "flex items-center gap-2 border-b border-aria-border-subtle px-3 py-3.5",
           headerClassName
         )}
       >
-        <span
-          className="flex size-6 items-center justify-center rounded-[7px] font-heading text-[11px] font-bold text-white"
-          style={{ background: logoColor }}
-        >
-          {logo}
-        </span>
-        <span className="font-heading text-[15px] font-semibold text-aria-text">
-          {title}
-        </span>
-        {badge}
-        {actions && <div className="ml-auto flex items-center">{actions}</div>}
+        <div className="widget-drag-handle flex min-w-0 flex-1 cursor-grab items-center gap-2.5 active:cursor-grabbing">
+          <span
+            className="flex size-6 shrink-0 items-center justify-center rounded-[7px] font-heading text-[11px] font-bold text-white"
+            style={{ background: logoColor }}
+          >
+            {logo}
+          </span>
+          <span className="truncate font-heading text-[15px] font-semibold text-aria-text">
+            {title}
+          </span>
+          {badge}
+        </div>
+        {actions && <div className="flex shrink-0 items-center">{actions}</div>}
       </div>
-      <div className="flex flex-1 flex-col">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</div>
       {footer && (
         <div className="border-t border-aria-border-subtle">{footer}</div>
       )}

@@ -4,6 +4,12 @@ import { canCreateDashboard } from "@/lib/billing/limit-enforcer";
 import { createDashboard, listDashboards } from "@/lib/dashboard/service";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import {
+  assertMemberCanMutate,
+  filterByMemberAccess,
+  getMemberAccess,
+  memberAccessDeniedResponse,
+} from "@/lib/rbac/member-access";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function GET(req: Request) {
@@ -17,7 +23,12 @@ export async function GET(req: Request) {
     const ctx = await resolveWorkspaceContext(userId, { request: req });
 
     const supabase = getSupabaseAdmin();
-    const dashboards = await listDashboards(supabase, ctx.workspaceId);
+    let dashboards = await listDashboards(supabase, ctx.workspaceId);
+
+    const memberAccess = await getMemberAccess(ctx);
+    if (memberAccess) {
+      dashboards = filterByMemberAccess(dashboards, memberAccess.allowedDashboardIds);
+    }
 
     return Response.json({ dashboards });
   } catch (err) {
@@ -37,6 +48,12 @@ export async function POST(req: Request) {
 
     await ensureSupabaseUser(userId);
     const ctx = await resolveWorkspaceContext(userId, { request: req });
+
+    try {
+      assertMemberCanMutate(ctx);
+    } catch (err) {
+      return memberAccessDeniedResponse(err);
+    }
 
     const body = (await req.json()) as {
       name?: string;

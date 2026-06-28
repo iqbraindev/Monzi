@@ -1,24 +1,27 @@
 import { SignIn } from "@clerk/nextjs";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthSocialButtons } from "@/components/auth/auth-social-buttons";
 import { signInAppearance } from "@/lib/clerk-auth-appearance";
 
 export default function SignInPage() {
   return (
     <AuthShell
-      title="Sign In"
-      panel={{
-        heading: "Hey There!",
-        description:
-          "Create your account now and step into an amazing new journey.",
-        ctaLabel: "Sign Up",
-        ctaHref: "/sign-up",
+      title="Sign in"
+      subtitle="Welcome back — pick up where you left off with your agents and dashboard."
+      footerLink={{
+        prompt: "New to Monzi?",
+        linkLabel: "Create free account",
+        href: "/sign-up",
       }}
     >
-      <SignIn
-        appearance={signInAppearance}
-        forceRedirectUrl="/dashboard"
-        signUpForceRedirectUrl="/dashboard"
-      />
+      <AuthSocialButtons mode="sign-in" redirectUrl="/dashboard" />
+      <div className="auth-form">
+        <SignIn
+          appearance={signInAppearance}
+          forceRedirectUrl="/dashboard"
+          signUpForceRedirectUrl="/dashboard"
+        />
+      </div>
     </AuthShell>
   );
 }

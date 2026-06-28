@@ -14,7 +14,8 @@ import {
 } from "@/lib/aria/mock-data";
 import type { Integration } from "@/lib/aria/types";
 import { IntegrationLogo } from "@/components/aria/integrations/integration-logo";
-import { catalogIntegrations } from "@/lib/composio/toolkits";
+import { useComposioCatalog } from "@/hooks/use-composio-catalog";
+import { integrationFromToolkitSlug } from "@/lib/composio/toolkits";
 import { useAgents, useInvalidateAgents } from "@/hooks/use-agents";
 import {
   useComposioConnections,
@@ -29,6 +30,7 @@ export function IntegrationsView() {
   const invalidate = useInvalidateComposioConnections();
   const invalidateAgents = useInvalidateAgents();
   const { data: agents = [] } = useAgents();
+  const { data: catalogApps = [], isLoading: catalogLoading } = useComposioCatalog();
 
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("All");
@@ -47,13 +49,37 @@ export function IntegrationsView() {
   );
 
   const catalog = useMemo(() => {
-    return catalogIntegrations().map((app) => ({
+    return catalogApps.map((app) => ({
       ...app,
       connected: connectedSlugs.has(app.toolkitSlug ?? ""),
     }));
-  }, [connectedSlugs]);
+  }, [catalogApps, connectedSlugs]);
 
-  const connected = catalog.filter((a) => a.connected);
+  const connected = useMemo(() => {
+    const catalogBySlug = new Map(
+      catalogApps.map((app) => [app.toolkitSlug ?? "", app])
+    );
+
+    return connections.map((conn) => {
+      const fromCatalog = catalogBySlug.get(conn.toolkit);
+      if (fromCatalog) return { ...fromCatalog, connected: true };
+
+      const fallback = integrationFromToolkitSlug(conn.toolkit, true);
+      return (
+        fallback ?? {
+          name: conn.name,
+          toolkitSlug: conn.toolkit,
+          glyph: conn.name.slice(0, 1).toUpperCase(),
+          bg: "#444444",
+          fg: "#ffffff",
+          category: "Other",
+          desc: "",
+          popular: false,
+          connected: true,
+        }
+      );
+    });
+  }, [catalogApps, connections]);
 
   useEffect(() => {
     const slug = searchParams.get("connected");
@@ -188,7 +214,7 @@ export function IntegrationsView() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search 250+ integrations..."
+            placeholder="Search integrations..."
             className="min-w-0 flex-1 bg-transparent text-sm text-aria-text outline-none placeholder:text-aria-text-muted"
           />
         </div>
@@ -204,7 +230,7 @@ export function IntegrationsView() {
           </span>
         </div>
 
-        {isLoading ? (
+        {isLoading || catalogLoading ? (
           <p className="text-sm text-aria-text-muted">Loading connections…</p>
         ) : connected.length === 0 ? (
           <p className="text-sm text-aria-text-muted">
@@ -259,7 +285,7 @@ export function IntegrationsView() {
           Browse all integrations
         </h2>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-aria-primary/30 bg-aria-primary/15 px-3 py-0.5 text-xs font-semibold text-aria-primary-light">
-          ✨ 250+ apps available
+          ✨ {catalog.length} apps available
         </span>
       </div>
 

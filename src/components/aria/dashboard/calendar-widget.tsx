@@ -1,6 +1,5 @@
 "use client";
 
-import { EVENTS } from "@/lib/aria/mock-data";
 import type { CalendarEvent } from "@/lib/aria/types";
 import { WidgetShell } from "@/components/aria/dashboard/widget-shell";
 import {
@@ -8,18 +7,21 @@ import {
   WidgetErrorState,
   WidgetLoadingState,
 } from "@/components/aria/dashboard/widget-data-states";
+import { useWidgetConnection } from "@/hooks/use-widget-connection";
 import { useWidgetData } from "@/hooks/use-widget-data";
 
 export function CalendarWidget() {
+  const { toolkit, connected, isLoading: connLoading } =
+    useWidgetConnection("calendar");
   const { data, isLoading, error, refetch, isError } = useWidgetData<{
     events: CalendarEvent[];
-  }>("calendar");
+  }>("calendar", { enabled: connected });
 
   const events = data?.events ?? [];
-  const display = events.length ? events : EVENTS;
   const notConnected =
-    isError &&
-    (error as Error & { code?: string })?.code === "NOT_CONNECTED";
+    (!connLoading && !connected) ||
+    (isError &&
+      (error as Error & { code?: string })?.code === "NOT_CONNECTED");
 
   return (
     <WidgetShell
@@ -33,22 +35,27 @@ export function CalendarWidget() {
         </span>
       }
     >
-      {isLoading && <WidgetLoadingState />}
-      {notConnected && (
+      {(connLoading || (connected && isLoading)) && <WidgetLoadingState />}
+      {notConnected && toolkit && (
         <WidgetConnectCta
-          toolkit="googlecalendar"
+          toolkit={toolkit}
           label="Connect Google Calendar to see today's events."
         />
       )}
-      {isError && !notConnected && (
+      {connected && isError && !notConnected && (
         <WidgetErrorState
           message={error?.message ?? "Could not load calendar"}
           onRetry={() => void refetch()}
         />
       )}
-      {!isLoading && !notConnected && !isError && (
+      {connected && !isLoading && !notConnected && !isError && events.length === 0 && (
+        <div className="flex flex-1 items-center justify-center p-6 text-sm text-aria-text-muted">
+          No events today.
+        </div>
+      )}
+      {connected && !isLoading && !notConnected && !isError && events.length > 0 && (
         <div className="flex flex-1 flex-col gap-1 p-1.5">
-          {display.map((e) => (
+          {events.map((e) => (
             <div
               key={e.id}
               className="flex flex-col gap-0.5 rounded-[10px] border-l-2 px-2.5 py-2.5"

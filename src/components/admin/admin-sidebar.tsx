@@ -9,6 +9,7 @@ import {
   Activity,
   ScrollText,
   Plug,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Billing", href: "/admin/billing", icon: CreditCard },
   { label: "Usage", href: "/admin/usage", icon: Activity },
   { label: "Integrations", href: "/admin/integrations", icon: Plug },
+  { label: "Composio Apps", href: "/admin/apps", icon: Smartphone },
   { label: "Audit log", href: "/admin/audit", icon: ScrollText },
 ];
 

@@ -19,6 +19,10 @@ interface DashboardState {
   addWidget: (dashboardId: string, widget: DbWidget) => void;
   addDashboard: (dashboard: DbDashboard, widgets: DbWidget[]) => void;
   removeWidget: (dashboardId: string, widgetId: string) => void;
+  updateWidgetLayouts: (
+    dashboardId: string,
+    layouts: Array<{ id: string; x: number; y: number; w: number; h: number }>
+  ) => void;
   removeDashboard: (dashboardId: string) => void;
   setPickerOpen: (open: boolean) => void;
   setCreateModalOpen: (open: boolean) => void;
@@ -87,6 +91,24 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       dashboards: state.dashboards.map((d) =>
         d.id === dashboardId
           ? { ...d, widgets: d.widgets.filter((w) => w.id !== widgetId) }
+          : d
+      ),
+    })),
+  updateWidgetLayouts: (dashboardId, layouts) =>
+    set((state) => ({
+      dashboards: state.dashboards.map((d) =>
+        d.id === dashboardId
+          ? {
+              ...d,
+              widgets: d.widgets.map((w) => {
+                const next = layouts.find((l) => l.id === w.id);
+                if (!next) return w;
+                return {
+                  ...w,
+                  layout: { x: next.x, y: next.y, w: next.w, h: next.h },
+                };
+              }),
+            }
           : d
       ),
     })),

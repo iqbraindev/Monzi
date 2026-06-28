@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Check, Sparkles } from "lucide-react";
 
-import { TASKS } from "@/lib/aria/mock-data";
 import type { TaskItem, TaskPriority } from "@/lib/aria/types";
 import {
   WidgetBadge,
@@ -14,6 +13,7 @@ import {
   WidgetErrorState,
   WidgetLoadingState,
 } from "@/components/aria/dashboard/widget-data-states";
+import { useWidgetConnection } from "@/hooks/use-widget-connection";
 import { useWidgetData } from "@/hooks/use-widget-data";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
@@ -23,17 +23,19 @@ const PRIORITY_COLOR: Record<TaskPriority, string> = {
 };
 
 export function TasksWidget() {
+  const { toolkit, connected, isLoading: connLoading } = useWidgetConnection("tasks");
   const { data, isLoading, error, refetch, isError } = useWidgetData<{
     tasks: TaskItem[];
-  }>("tasks");
+  }>("tasks", { enabled: connected });
 
   const [localTasks, setLocalTasks] = useState<TaskItem[] | null>(null);
   const fetched = data?.tasks ?? [];
-  const tasks = localTasks ?? (fetched.length ? fetched : TASKS);
+  const tasks = localTasks ?? fetched;
   const pending = tasks.filter((t) => !t.done).length;
   const notConnected =
-    isError &&
-    (error as Error & { code?: string })?.code === "NOT_CONNECTED";
+    (!connLoading && !connected) ||
+    (isError &&
+      (error as Error & { code?: string })?.code === "NOT_CONNECTED");
 
   const toggle = (id: string) =>
     setLocalTasks((prev) => {
@@ -47,9 +49,13 @@ export function TasksWidget() {
       logoColor="#111111"
       title="Tasks"
       span="lg:col-span-4"
-      actions={<WidgetBadge>{pending} pending</WidgetBadge>}
+      actions={
+        connected && !notConnected ? (
+          <WidgetBadge>{pending} pending</WidgetBadge>
+        ) : undefined
+      }
       footer={
-        !notConnected && !isLoading ? (
+        connected && !notConnected && !isLoading ? (
           <div className="flex items-center justify-between gap-2 px-4 py-3">
             <button className="text-[13px] text-aria-text-secondary hover:text-aria-text">
               + Add task
@@ -61,20 +67,30 @@ export function TasksWidget() {
         ) : undefined
       }
     >
-      {isLoading && <WidgetLoadingState />}
-      {notConnected && (
+      {(connLoading || (connected && isLoading)) && <WidgetLoadingState />}
+      {notConnected && toolkit && (
         <WidgetConnectCta
-          toolkit="notion"
+          toolkit={toolkit}
           label="Connect Notion to sync your tasks."
         />
       )}
-      {isError && !notConnected && (
+      {connected && isError && !notConnected && (
         <WidgetErrorState
           message={error?.message ?? "Could not load tasks"}
           onRetry={() => void refetch()}
         />
       )}
-      {!isLoading &&
+      {connected &&
+        !isLoading &&
+        !notConnected &&
+        !isError &&
+        tasks.length === 0 && (
+          <div className="p-6 text-center text-sm text-aria-text-muted">
+            No tasks to show.
+          </div>
+        )}
+      {connected &&
+        !isLoading &&
         !notConnected &&
         !isError &&
         tasks.map((t) => (

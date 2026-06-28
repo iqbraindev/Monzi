@@ -3,11 +3,16 @@ import { NextRequest } from "next/server";
 
 import { getOrCreateAuthConfigId } from "@/lib/composio/auth-configs";
 import { assignToolkitToAgents } from "@/lib/composio/agent-toolkits";
+import { isCatalogAppEnabled } from "@/lib/composio/catalog";
 import { getAppCallbackUrl } from "@/lib/composio/client";
 import { incrementIntegrationsConnected } from "@/lib/composio/limits";
 import { getComposioScope } from "@/lib/composio/scope";
 import { initiateConnection, listActiveConnections } from "@/lib/composio/tools";
 import { canConnectIntegration } from "@/lib/billing/limit-enforcer";
+import {
+  assertMemberCanMutate,
+  memberAccessDeniedResponse,
+} from "@/lib/rbac/member-access";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function POST(req: NextRequest) {
@@ -17,6 +22,13 @@ export async function POST(req: NextRequest) {
   }
 
   const ctx = await resolveWorkspaceContext(userId, { request: req });
+
+  try {
+    assertMemberCanMutate(ctx);
+  } catch (err) {
+    return memberAccessDeniedResponse(err);
+  }
+
   const composioScope = getComposioScope(ctx);
 
   const body = (await req.json()) as {
@@ -30,6 +42,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    if (!(await isCatalogAppEnabled(toolkit))) {
+      return Response.json(
+        { error: "This integration is not available on the platform" },
+        { status: 403 }
+      );
+    }
+
     const existing = await listActiveConnections(ctx.workspaceId, composioScope);
     const alreadyConnected = existing.some(
       (c) => c.toolkit?.slug === toolkit

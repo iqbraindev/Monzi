@@ -1,24 +1,27 @@
 import { SignUp } from "@clerk/nextjs";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthSocialButtons } from "@/components/auth/auth-social-buttons";
 import { signUpAppearance } from "@/lib/clerk-auth-appearance";
 
 export default function SignUpPage() {
   return (
     <AuthShell
-      title="Sign Up"
-      panel={{
-        heading: "Welcome Back!",
-        description:
-          "Already have an account? Sign in and pick up right where you left off.",
-        ctaLabel: "Sign In",
-        ctaHref: "/sign-in",
+      title="Create your account"
+      subtitle="Free to start — set up your workspace and first agent in under two minutes."
+      footerLink={{
+        prompt: "Already have an account?",
+        linkLabel: "Sign in",
+        href: "/sign-in",
       }}
     >
-      <SignUp
-        appearance={signUpAppearance}
-        forceRedirectUrl="/onboarding"
-        signInForceRedirectUrl="/dashboard"
-      />
+      <AuthSocialButtons mode="sign-up" redirectUrl="/onboarding" />
+      <div className="auth-form">
+        <SignUp
+          appearance={signUpAppearance}
+          forceRedirectUrl="/onboarding"
+          signInForceRedirectUrl="/dashboard"
+        />
+      </div>
     </AuthShell>
   );
 }

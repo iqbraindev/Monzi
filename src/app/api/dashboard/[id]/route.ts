@@ -5,6 +5,10 @@ import {
   updateDashboard,
 } from "@/lib/dashboard/service";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  assertMemberCanMutate,
+  memberAccessDeniedResponse,
+} from "@/lib/rbac/member-access";
 import { ensureSupabaseUser } from "@/lib/users/provision";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
@@ -20,6 +24,12 @@ export async function PATCH(
 
     await ensureSupabaseUser(userId);
     const ctx = await resolveWorkspaceContext(userId, { request: req });
+
+    try {
+      assertMemberCanMutate(ctx);
+    } catch (err) {
+      return memberAccessDeniedResponse(err);
+    }
 
     const { id: dashboardId } = await params;
     const body = (await req.json()) as {
@@ -58,6 +68,12 @@ export async function DELETE(
 
     await ensureSupabaseUser(userId);
     const ctx = await resolveWorkspaceContext(userId, { request: req });
+
+    try {
+      assertMemberCanMutate(ctx);
+    } catch (err) {
+      return memberAccessDeniedResponse(err);
+    }
 
     const { id: dashboardId } = await params;
     const supabase = getSupabaseAdmin();

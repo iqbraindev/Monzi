@@ -62,6 +62,7 @@ export function WorkspaceSwitcher({ expanded }: { expanded: boolean }) {
   const activeWorkspaceId = limitsData?.workspaceId as string | undefined;
   const active =
     workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0];
+  const canCreateWorkspace = workspaces.some((w) => w.member_role === "owner");
 
   const displayName = user ? getUserDisplayName(user) : "Account";
   const workspaceInitials = (active?.name ?? "W").slice(0, 1).toUpperCase();
@@ -150,17 +151,19 @@ export function WorkspaceSwitcher({ expanded }: { expanded: boolean }) {
               </button>
             ))}
             <div className="my-1 h-px bg-aria-border-subtle" />
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                setCreateOpen(true);
-              }}
-              className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-2 text-[13px] font-medium text-aria-primary-light transition-colors hover:bg-aria-subtle"
-            >
-              <Plus className="size-4" />
-              Create workspace
-            </button>
+            {canCreateWorkspace && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setCreateOpen(true);
+                }}
+                className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-2 text-[13px] font-medium text-aria-primary-light transition-colors hover:bg-aria-subtle"
+              >
+                <Plus className="size-4" />
+                Create workspace
+              </button>
+            )}
           </div>
         )}
       </div>

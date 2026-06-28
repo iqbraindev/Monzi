@@ -238,6 +238,10 @@
   from { transform: translateX(24px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+@keyframes aria-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
 
 /* Glass-morphism surface */
 .aria-glass {
@@ -267,6 +271,7 @@
 
 .aria-breathe { animation: aria-breathe 4s ease-in-out infinite; }
 .aria-float { animation: aria-float 6s ease-in-out infinite; }
+.animate-aria-marquee { animation: aria-marquee linear infinite; }
 .agent-avatar-face {
   object-fit: cover;
   object-position: 50% var(--avatar-face-y, 6%);

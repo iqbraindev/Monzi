@@ -16,6 +16,7 @@ import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
 import { SidebarUsageMeter } from "@/components/aria/sidebar-usage-meter";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/store/ui-store";
+import { useLimits } from "@/hooks/use-workspaces";
 
 interface NavItem {
   label: string;
@@ -66,6 +67,16 @@ export function Sidebar() {
   const pathname = usePathname();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const expanded = !collapsed;
+  const { data: limitsData } = useLimits();
+  const isMember = limitsData?.memberRole === "member";
+
+  const navManage = isMember
+    ? NAV_MANAGE.filter((item) => item.href === "/settings")
+    : NAV_MANAGE;
+
+  const navMain = isMember
+    ? NAV_MAIN.filter((item) => item.href !== "/integrations")
+    : NAV_MAIN;
 
   return (
     <aside
@@ -75,7 +86,7 @@ export function Sidebar() {
       <WorkspaceSwitcher expanded={expanded} />
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto p-2">
-        {NAV_MAIN.map((item) => (
+        {navMain.map((item) => (
           <NavLink
             key={item.href}
             item={item}
@@ -84,12 +95,12 @@ export function Sidebar() {
           />
         ))}
 
-        {expanded && (
+        {expanded && navManage.length > 0 && (
           <div className="px-3 pt-3.5 pb-1.5 text-[11px] font-semibold tracking-[0.08em] text-aria-text-muted uppercase">
             Manage
           </div>
         )}
-        {NAV_MANAGE.map((item) => (
+        {navManage.map((item) => (
           <NavLink
             key={item.href}
             item={item}
@@ -100,7 +111,7 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t border-aria-border-subtle p-2">
-        <SidebarUsageMeter expanded={expanded} />
+        {!isMember && <SidebarUsageMeter expanded={expanded} />}
       </div>
     </aside>
   );

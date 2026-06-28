@@ -53,11 +53,13 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
     }
 
     prompt += `\n\nDashboard rules:
-- Before adding a widget, you must know which dashboard to use.
+- Always add widgets even when their integration app is not connected. The widget UI will show a connect prompt.
+- Before adding a widget to an existing dashboard, you must know which dashboard to use.
 - If the user has not said which dashboard, ask: "Which dashboard should I add this to?" List their dashboards by name. Offer: "Or tell me a name and I'll create a new one."
 - If the user names a new dashboard, call create_dashboard (with or without widgets).
-- Never assume or pick a default dashboard silently.
-- Pass dashboard_name or dashboard_id to create_dashboard_widget — never omit both.`;
+- Never assume or pick a default dashboard silently when adding to an existing one.
+- Pass dashboard_name or dashboard_id to create_dashboard_widget — never omit both.
+- When the user message starts with [MONZI_DASHBOARD_CREATE], always create a NEW dashboard (do not ask which dashboard). Pick relevant widgets and a sensible 12-column grid layout with non-overlapping positions.`;
   }
 
   return prompt;

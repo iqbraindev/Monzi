@@ -22,6 +22,12 @@ import { getComposioScope } from "@/lib/composio/scope";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureSupabaseUser } from "@/lib/users/provision";
+import {
+  filterByMemberAccess,
+  getMemberAccess,
+  assertMemberCanMutate,
+  memberAccessDeniedResponse,
+} from "@/lib/rbac/member-access";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 function toSlug(name: string): string {
@@ -69,9 +75,15 @@ export async function GET(req: Request) {
   ).catch(() => [] as string[]);
   const voiceAllowed = await getUserVoiceEnabled(ctx.ownerUserId);
   const agentLimit = await getUserAgentLimit(ctx.ownerUserId);
-  const uiAgents = (agents as DbAgent[]).map((a) =>
+  let uiAgents = (agents as DbAgent[]).map((a) =>
     dbAgentToUiAgent(a, 0, connectedToolkits, voiceAllowed)
   );
+
+  const memberAccess = await getMemberAccess(ctx);
+  if (memberAccess) {
+    uiAgents = filterByMemberAccess(uiAgents, memberAccess.allowedAgentIds);
+  }
+
   return Response.json({
     agents: uiAgents,
     meta: {
@@ -110,6 +122,13 @@ export async function POST(req: Request) {
   }
 
   const ctx = await resolveWorkspaceContext(userId, { request: req });
+
+  try {
+    assertMemberCanMutate(ctx);
+  } catch (err) {
+    return memberAccessDeniedResponse(err);
+  }
+
   const composioScope = getComposioScope(ctx);
   const supabase = getSupabaseAdmin();
 

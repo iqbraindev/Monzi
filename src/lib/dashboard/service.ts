@@ -2,11 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ComposioScopeOptions } from "@/lib/composio/scope";
 import { listActiveConnections } from "@/lib/composio/tools";
+import { canCreateDashboard, canCreateWidget } from "@/lib/billing/limit-enforcer";
+import { broadcastDashboardCreated } from "@/lib/dashboard/broadcast";
 
 import type {
   DashboardWithWidgets,
   DbDashboard,
   DbWidget,
+  WidgetLayout,
   WidgetType,
 } from "@/lib/dashboard/types";
 import {
@@ -15,6 +18,7 @@ import {
   getRequiredToolkit,
   layoutForSize,
 } from "@/lib/dashboard/widget-registry";
+import { nextLayoutRow } from "@/lib/dashboard/layout-utils";
 
 export interface DashboardSummary {
   id: string;
@@ -123,6 +127,137 @@ export async function assertWidgetConnection(
   };
 }
 
+export interface ConnectionHint {
+  widgetType: string;
+  widgetTitle: string;
+  toolkit: string;
+}
+
+export interface CreateDashboardWithWidgetsResult {
+  dashboard: DbDashboard;
+  widgets: DbWidget[];
+  connectionHints: ConnectionHint[];
+  skippedWidgets: string[];
+}
+
+export async function getConnectionHintsForWidgetTypes(
+  workspaceId: string,
+  widgetTypes: string[],
+  composioScope?: ComposioScopeOptions
+): Promise<ConnectionHint[]> {
+  const connections = await listActiveConnections(workspaceId, composioScope);
+  const connectedSlugs = new Set(
+    connections
+      .map((c) => c.toolkit?.slug?.toLowerCase())
+      .filter((slug): slug is string => Boolean(slug))
+  );
+
+  const hints: ConnectionHint[] = [];
+  for (const type of widgetTypes) {
+    const toolkit = getRequiredToolkit(type);
+    if (!toolkit || connectedSlugs.has(toolkit.toLowerCase())) continue;
+    const reg = getRegistryEntry(type);
+    hints.push({
+      widgetType: type,
+      widgetTitle: reg?.defaultTitle ?? type,
+      toolkit,
+    });
+  }
+  return hints;
+}
+
+export async function createDashboardWithWidgets(
+  supabase: SupabaseClient,
+  params: {
+    userId: string;
+    workspaceId: string;
+    ownerUserId: string;
+    name: string;
+    description?: string;
+    icon?: string;
+    createdBy?: "user" | "agent";
+    widgets: Array<{
+      type: string;
+      title?: string;
+      layout?: WidgetLayout;
+      size?: "small" | "medium" | "large";
+    }>;
+    composioScope?: ComposioScopeOptions;
+    autoSwitch?: boolean;
+  }
+): Promise<CreateDashboardWithWidgetsResult> {
+  const dashboardCheck = await canCreateDashboard(
+    params.workspaceId,
+    params.ownerUserId
+  );
+  if (!dashboardCheck.ok) {
+    throw new Error(dashboardCheck.error.error);
+  }
+
+  const dashboard = await createDashboard(supabase, {
+    userId: params.userId,
+    workspaceId: params.workspaceId,
+    name: params.name,
+    description: params.description,
+    icon: params.icon,
+    createdBy: params.createdBy,
+  });
+
+  const createdWidgets: DbWidget[] = [];
+  const skippedWidgets: string[] = [];
+
+  for (const widgetSpec of params.widgets) {
+    const widgetCheck = await canCreateWidget(
+      params.workspaceId,
+      params.ownerUserId,
+      dashboard.id
+    );
+    if (!widgetCheck.ok) {
+      skippedWidgets.push(widgetSpec.type);
+      continue;
+    }
+
+    const reg = getRegistryEntry(widgetSpec.type);
+    if (!reg) {
+      skippedWidgets.push(widgetSpec.type);
+      continue;
+    }
+
+    const widget = await createWidget(supabase, {
+      workspaceId: params.workspaceId,
+      dashboardId: dashboard.id,
+      type: widgetSpec.type,
+      title: widgetSpec.title ?? reg.defaultTitle,
+      layout: widgetSpec.layout,
+      size: widgetSpec.size,
+      composioScope: params.composioScope,
+      skipConnectionCheck: true,
+      createdBy: params.createdBy ?? "user",
+    });
+    createdWidgets.push(widget);
+  }
+
+  const connectionHints = await getConnectionHintsForWidgetTypes(
+    params.workspaceId,
+    createdWidgets.map((w) => w.type),
+    params.composioScope
+  );
+
+  await broadcastDashboardCreated(
+    params.workspaceId,
+    dashboard,
+    createdWidgets,
+    params.autoSwitch ?? true
+  );
+
+  return {
+    dashboard,
+    widgets: createdWidgets,
+    connectionHints,
+    skippedWidgets,
+  };
+}
+
 export async function createDashboard(
   supabase: SupabaseClient,
   params: {
@@ -221,6 +356,47 @@ export async function deleteWidget(
   if (error) throw new Error(error.message);
 }
 
+export async function updateWidgetLayouts(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  dashboardId: string,
+  layouts: Array<{ id: string; x: number; y: number; w: number; h: number }>
+): Promise<void> {
+  const { data: dashboard } = await supabase
+    .from("dashboards")
+    .select("id")
+    .eq("id", dashboardId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (!dashboard) throw new Error("Dashboard not found");
+
+  const updatedAt = new Date().toISOString();
+
+  const results = await Promise.all(
+    layouts.map(({ id, x, y, w, h }) =>
+      supabase
+        .from("widgets")
+        .update({
+          layout: { x, y, w, h },
+          updated_at: updatedAt,
+        })
+        .eq("id", id)
+        .eq("dashboard_id", dashboardId)
+        .select("id")
+    )
+  );
+
+  for (const [index, { data, error }] of results.entries()) {
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data?.length) {
+      throw new Error(`Widget not found: ${layouts[index]?.id ?? "unknown"}`);
+    }
+  }
+}
+
 export async function createWidget(
   supabase: SupabaseClient,
   params: {
@@ -251,6 +427,19 @@ export async function createWidget(
     ...params.dataSource,
   };
 
+  let resolvedLayout = params.layout;
+  if (!resolvedLayout) {
+    const { data: existingWidgets } = await supabase
+      .from("widgets")
+      .select("layout")
+      .eq("dashboard_id", params.dashboardId);
+
+    const nextY = nextLayoutRow(
+      (existingWidgets ?? []) as Array<{ layout?: WidgetLayout | null }>
+    );
+    resolvedLayout = layoutForSize(params.size ?? "medium", nextY);
+  }
+
   const { data, error } = await supabase
     .from("widgets")
     .insert({
@@ -258,7 +447,7 @@ export async function createWidget(
       type: params.type,
       title: params.title,
       data_source: dataSource,
-      layout: params.layout ?? layoutForSize(params.size ?? "medium"),
+      layout: resolvedLayout,
       created_by: params.createdBy ?? "user",
     })
     .select("*")

@@ -120,15 +120,17 @@ export function SidebarUsageMeter({ expanded }: SidebarUsageMeterProps) {
       {state.canUpgrade && state.nextPlanName && (
         <Link
           href={upgradeHref}
-          className="flex h-9 w-full items-center justify-center gap-1.5 rounded-[9px] bg-aria-primary text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(124,58,237,0.35)] transition-opacity hover:opacity-90"
+          className="flex min-h-9 w-full items-center justify-between gap-2 rounded-[9px] bg-aria-primary px-3 py-2 text-white shadow-[0_4px_16px_rgba(124,58,237,0.35)] transition-opacity hover:opacity-90"
         >
-          Upgrade to {state.nextPlanName}
-          {state.nextPlanPrice != null && (
-            <span className="text-[11px] font-medium text-white/80">
-              · ${Number(state.nextPlanPrice).toFixed(0)}/mo
-            </span>
-          )}
-          <ArrowUpRight className="size-3.5 opacity-80" />
+          <span className="min-w-0 text-left text-[12px] font-semibold leading-snug">
+            Upgrade to {state.nextPlanName}
+          </span>
+          <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-white/85">
+            {state.nextPlanPrice != null && (
+              <span>${Number(state.nextPlanPrice).toFixed(0)}/mo</span>
+            )}
+            <ArrowUpRight className="size-3.5 opacity-90" />
+          </span>
         </Link>
       )}
     </div>

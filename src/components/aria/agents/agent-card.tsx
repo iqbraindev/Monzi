@@ -15,11 +15,13 @@ import {
   deleteAgent,
   useRemoveAgentFromCache,
 } from "@/hooks/use-agents";
+import { useCallDuration } from "@/hooks/use-call-duration";
 import { useElevenLabsVoiceSession } from "@/hooks/use-elevenlabs-voice-session";
 import { useCallRingtone } from "@/hooks/use-call-ringtone";
 import { AppLogo } from "@/components/aria/integrations/integration-logo";
 import { AgentAvatar } from "@/components/aria/agent-avatar";
 import { cn } from "@/lib/utils";
+import { formatCallDuration } from "@/lib/voice/format-call-duration";
 import { writeVoiceModePreference } from "@/lib/voice/preferences";
 import { unlockBrowserAudio } from "@/lib/voice/unlock-audio";
 import type { Agent } from "@/lib/aria/types";
@@ -32,12 +34,6 @@ const MESSAGE_BTN =
 
 const CALL_BTN =
   "flex size-11 cursor-pointer items-center justify-center rounded-full text-white transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40";
-
-function formatCallDuration(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
 
 function callStatusLabel(
   state: ReturnType<typeof useElevenLabsVoiceSession>["state"]
@@ -66,8 +62,6 @@ export function AgentCard({ agent }: { agent: Agent }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [callActive, setCallActive] = useState(false);
-  const [callStartTime, setCallStartTime] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isActive = agent.status === "active";
@@ -87,6 +81,11 @@ export function AgentCard({ agent }: { agent: Agent }) {
     voiceEnabledOnAgent: agent.voice.enabled,
   });
 
+  const { elapsedSeconds, resetCallDuration } = useCallDuration(
+    callActive,
+    voiceConnected
+  );
+
   useCallRingtone(callActive && voiceState === "connecting");
 
   useEffect(() => {
@@ -100,28 +99,10 @@ export function AgentCard({ agent }: { agent: Agent }) {
     return () => window.removeEventListener("mousedown", onClick);
   }, [menuOpen]);
 
-  useEffect(() => {
-    if (!callActive) return;
-    if (voiceConnected && callStartTime === null) {
-      setCallStartTime(Date.now());
-    }
-  }, [callActive, voiceConnected, callStartTime]);
-
-  useEffect(() => {
-    if (!callStartTime) return;
-    const tick = () => {
-      setElapsedSeconds(Math.floor((Date.now() - callStartTime) / 1000));
-    };
-    tick();
-    const interval = window.setInterval(tick, 1000);
-    return () => window.clearInterval(interval);
-  }, [callStartTime]);
-
   const resetCallUi = useCallback(() => {
     setCallActive(false);
-    setCallStartTime(null);
-    setElapsedSeconds(0);
-  }, []);
+    resetCallDuration();
+  }, [resetCallDuration]);
 
   const endCall = useCallback(async () => {
     resetCallUi();

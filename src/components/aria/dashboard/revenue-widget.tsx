@@ -1,12 +1,12 @@
 "use client";
 
-import { REVENUE_SERIES } from "@/lib/aria/mock-data";
 import { WidgetShell } from "@/components/aria/dashboard/widget-shell";
 import {
   WidgetConnectCta,
   WidgetErrorState,
   WidgetLoadingState,
 } from "@/components/aria/dashboard/widget-data-states";
+import { useWidgetConnection } from "@/hooks/use-widget-connection";
 import { useWidgetData } from "@/hooks/use-widget-data";
 
 const W = 520;
@@ -30,15 +30,19 @@ function buildPaths(series: number[]) {
 }
 
 export function RevenueWidget() {
+  const { toolkit, connected, isLoading: connLoading } =
+    useWidgetConnection("revenue");
   const { data, isLoading, error, refetch, isError } = useWidgetData<{
     series: number[];
-  }>("revenue");
+  }>("revenue", { enabled: connected });
 
-  const series = data?.series?.length ? data.series : REVENUE_SERIES;
-  const { line, area, last } = buildPaths(series);
+  const series = data?.series ?? [];
+  const hasData = series.length > 0;
+  const chart = hasData ? buildPaths(series) : null;
   const notConnected =
-    isError &&
-    (error as Error & { code?: string })?.code === "NOT_CONNECTED";
+    (!connLoading && !connected) ||
+    (isError &&
+      (error as Error & { code?: string })?.code === "NOT_CONNECTED");
 
   return (
     <WidgetShell
@@ -47,25 +51,32 @@ export function RevenueWidget() {
       title="Revenue"
       span="lg:col-span-6"
       actions={
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-aria-success/15 px-2.5 py-1 text-xs font-semibold text-aria-success">
-          Live
-        </span>
+        connected && !notConnected && hasData ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-aria-success/15 px-2.5 py-1 text-xs font-semibold text-aria-success">
+            Live
+          </span>
+        ) : undefined
       }
     >
-      {isLoading && <WidgetLoadingState />}
-      {notConnected && (
+      {(connLoading || (connected && isLoading)) && <WidgetLoadingState />}
+      {notConnected && toolkit && (
         <WidgetConnectCta
-          toolkit="stripe"
+          toolkit={toolkit}
           label="Connect Stripe to track revenue."
         />
       )}
-      {isError && !notConnected && (
+      {connected && isError && !notConnected && (
         <WidgetErrorState
           message={error?.message ?? "Could not load revenue"}
           onRetry={() => void refetch()}
         />
       )}
-      {!isLoading && !notConnected && !isError && (
+      {connected && !isLoading && !notConnected && !isError && !hasData && (
+        <div className="flex flex-1 items-center justify-center p-6 text-sm text-aria-text-muted">
+          No revenue data yet.
+        </div>
+      )}
+      {connected && !isLoading && !notConnected && !isError && chart && (
         <>
           <div className="px-4 pt-4 pb-1">
             <div className="font-heading text-3xl font-bold tracking-tight">
@@ -91,15 +102,15 @@ export function RevenueWidget() {
                   <stop offset="100%" stopColor="#06B6D4" />
                 </linearGradient>
               </defs>
-              <path d={area} fill="url(#aria-rev-fill)" />
+              <path d={chart.area} fill="url(#aria-rev-fill)" />
               <path
-                d={line}
+                d={chart.line}
                 fill="none"
                 stroke="url(#aria-rev-line)"
                 strokeWidth="2.5"
                 strokeLinecap="round"
               />
-              <circle cx={last.x} cy={last.y} r="4" fill="#06B6D4" />
+              <circle cx={chart.last.x} cy={chart.last.y} r="4" fill="#06B6D4" />
             </svg>
           </div>
         </>

@@ -75,6 +75,64 @@ export async function ensureSupabaseUser(userId: string): Promise<void> {
   await provisionSupabaseUser(userId);
 }
 
+/**
+ * If this email was invited before signup, attach pending workspace access to the real Clerk user.
+ */
+async function claimPendingInvite(
+  userId: string,
+  email: string,
+  user: Awaited<ReturnType<Awaited<ReturnType<typeof clerkClient>>["users"]["getUser"]>>
+): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+
+  const { data: pendingInvite } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", email)
+    .like("id", "invite_%")
+    .maybeSingle();
+
+  if (!pendingInvite) return false;
+
+  const inviteId = pendingInvite.id;
+
+  await supabase
+    .from("workspace_members")
+    .update({ user_id: userId })
+    .eq("user_id", inviteId);
+
+  await supabase
+    .from("subaccount_permissions")
+    .update({ subaccount_id: userId })
+    .eq("subaccount_id", inviteId);
+
+  await supabase.from("users").delete().eq("id", inviteId);
+
+  const { error: userError } = await supabase.from("users").insert({
+    id: userId,
+    email,
+    full_name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
+    avatar_url: user.imageUrl,
+    role: "subaccount",
+    is_active: true,
+  });
+
+  if (userError && userError.code !== "23505") {
+    throw new Error(userError.message);
+  }
+
+  const client = await clerkClient();
+  await client.users.updateUserMetadata(userId, {
+    publicMetadata: {
+      ...(user.publicMetadata ?? {}),
+      role: "subaccount",
+      onboarding_completed: true,
+    },
+  });
+
+  return true;
+}
+
 async function provisionSupabaseUser(userId: string): Promise<void> {
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
@@ -82,6 +140,11 @@ async function provisionSupabaseUser(userId: string): Promise<void> {
 
   if (!email) {
     throw new Error("No email found for user");
+  }
+
+  const claimedInvite = await claimPendingInvite(userId, email, user);
+  if (claimedInvite) {
+    return;
   }
 
   const role = resolveSuperAdminRole(email);

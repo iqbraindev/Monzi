@@ -16,6 +16,11 @@ import {
 import { getComposioScope } from "@/lib/composio/scope";
 import { filterComposioAppsForConnected } from "@/lib/composio/filter-apps";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  assertMemberCanMutate,
+  assertMemberCanUseAgent,
+  memberAccessDeniedResponse,
+} from "@/lib/rbac/member-access";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
 
 export async function GET(
@@ -43,6 +48,12 @@ export async function GET(
     return Response.json({ error: "Agent not found" }, { status: 404 });
   }
 
+  try {
+    await assertMemberCanUseAgent(ctx, id);
+  } catch (err) {
+    return memberAccessDeniedResponse(err);
+  }
+
   const connectedToolkits = await getConnectedToolkitSlugs(
     ctx.workspaceId,
     composioScope
@@ -65,6 +76,13 @@ export async function PATCH(
   }
 
   const ctx = await resolveWorkspaceContext(userId, { request: req });
+
+  try {
+    assertMemberCanMutate(ctx);
+  } catch (err) {
+    return memberAccessDeniedResponse(err);
+  }
+
   const composioScope = getComposioScope(ctx);
   const { id } = await params;
   const body = (await req.json()) as PatchAgentBody;
@@ -152,6 +170,13 @@ export async function DELETE(
   }
 
   const ctx = await resolveWorkspaceContext(userId, { request: req });
+
+  try {
+    assertMemberCanMutate(ctx);
+  } catch (err) {
+    return memberAccessDeniedResponse(err);
+  }
+
   const composioScope = getComposioScope(ctx);
   const { id } = await params;
   const supabase = getSupabaseAdmin();

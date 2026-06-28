@@ -1,6 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 
-import { assignToolkitToAgents } from "@/lib/composio/agent-toolkits";
+import {
+  assignToolkitToAgents,
+  syncToolkitToAgents,
+} from "@/lib/composio/agent-toolkits";
 import { getComposioScope } from "@/lib/composio/scope";
 import { listActiveConnections } from "@/lib/composio/tools";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
@@ -46,7 +49,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "toolkit is required" }, { status: 400 });
     }
 
-    await assignToolkitToAgents(ctx.workspaceId, toolkit, body.agentIds);
+    await syncToolkitToAgents(ctx.workspaceId, toolkit, body.agentIds);
     return Response.json({ synced: [toolkit] });
   } catch (err) {
     const message =

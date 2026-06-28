@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest } from "next/server";
 
 import { getOrCreateAuthConfigId } from "@/lib/composio/auth-configs";
-import { assignToolkitToAgents } from "@/lib/composio/agent-toolkits";
+import { syncToolkitToAgents } from "@/lib/composio/agent-toolkits";
 import { isCatalogAppEnabled } from "@/lib/composio/catalog";
 import { getAppCallbackUrl } from "@/lib/composio/client";
 import { incrementIntegrationsConnected } from "@/lib/composio/limits";
@@ -65,6 +65,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (alreadyConnected) {
+      await syncToolkitToAgents(ctx.workspaceId, toolkit, body.agentIds);
+      return Response.json({ alreadyConnected: true });
+    }
+
     const authConfigId = await getOrCreateAuthConfigId(toolkit);
 
     const connectionRequest = await initiateConnection(
@@ -73,11 +78,9 @@ export async function POST(req: NextRequest) {
       getAppCallbackUrl("/api/composio/callback")
     );
 
-    await assignToolkitToAgents(ctx.workspaceId, toolkit, body.agentIds);
+    await syncToolkitToAgents(ctx.workspaceId, toolkit, body.agentIds);
 
-    if (!alreadyConnected) {
-      await incrementIntegrationsConnected(ctx.workspaceId, ctx.ownerUserId);
-    }
+    await incrementIntegrationsConnected(ctx.workspaceId, ctx.ownerUserId);
 
     return Response.json({
       redirectUrl: connectionRequest.redirectUrl,

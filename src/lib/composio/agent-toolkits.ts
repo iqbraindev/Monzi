@@ -59,6 +59,49 @@ export async function assignToolkitToAgents(
   }
 }
 
+/** Set toolkit on exactly the listed agents; remove it from all others in the workspace. */
+export async function syncToolkitToAgents(
+  workspaceId: string,
+  toolkit: string,
+  agentIds?: string[]
+) {
+  if (agentIds === undefined) {
+    await assignToolkitToAgents(workspaceId, toolkit);
+    return;
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data: agents } = await supabase
+    .from("agents")
+    .select("id, tools")
+    .eq("workspace_id", workspaceId);
+
+  if (!agents) return;
+
+  const targetSet = new Set(agentIds.filter(Boolean));
+
+  for (const agent of agents) {
+    const tools = (agent.tools ?? {}) as AgentTools;
+    const apps = tools.composio_apps ?? [];
+    const shouldHave = targetSet.has(agent.id);
+    const hasToolkit = apps.includes(toolkit);
+
+    if (shouldHave === hasToolkit) continue;
+
+    const composio_apps = shouldHave
+      ? [...apps, toolkit]
+      : apps.filter((a) => a !== toolkit);
+
+    await supabase
+      .from("agents")
+      .update({
+        tools: { ...tools, composio_apps },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", agent.id);
+  }
+}
+
 export async function removeToolkitFromAgents(
   workspaceId: string,
   toolkit: string

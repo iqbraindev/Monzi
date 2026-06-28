@@ -131,9 +131,20 @@ export function IntegrationsView() {
     );
 
   const openConnect = (app: Integration) => {
+    const slug = app.toolkitSlug ?? "";
     setModalApp(app);
     setStep("form");
     setErrorMsg("");
+    setSelectedAgents(
+      Object.fromEntries(
+        agents.map((agent) => [
+          agent.id,
+          app.connected
+            ? agent.apps.some((glyph) => glyph.toolkitSlug === slug)
+            : true,
+        ])
+      )
+    );
   };
 
   const startConnect = async () => {
@@ -171,6 +182,7 @@ export function IntegrationsView() {
 
       setStep("success");
       invalidate();
+      invalidateAgents();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Connection failed");
       setStep("error");
@@ -369,7 +381,9 @@ export function IntegrationsView() {
               <IntegrationLogo app={modalApp} size={46} radius={12} />
               <div className="min-w-0 flex-1">
                 <div className="font-heading text-[17px] font-semibold text-aria-text">
-                  Connect {modalApp.name}
+                  {modalApp.connected
+                    ? `Manage ${modalApp.name}`
+                    : `Connect ${modalApp.name}`}
                 </div>
                 <div className="text-xs text-aria-text-secondary">
                   secure connection to Monzi
@@ -446,7 +460,9 @@ export function IntegrationsView() {
                   onClick={() => void startConnect()}
                   className="aria-gradient h-11 rounded-[11px] text-sm font-semibold text-white shadow-[0_6px_20px_rgba(124,58,237,0.3)] transition-[filter] hover:brightness-110"
                 >
-                  Connect with {modalApp.name}
+                  {modalApp.connected
+                    ? "Save changes"
+                    : `Connect with ${modalApp.name}`}
                 </button>
               </div>
             )}
@@ -494,11 +510,14 @@ export function IntegrationsView() {
                   <Check className="size-7" strokeWidth={2.6} />
                 </span>
                 <span className="font-heading text-lg font-semibold text-aria-text">
-                  {modalApp.name} connected
+                  {modalApp.connected
+                    ? `${modalApp.name} updated`
+                    : `${modalApp.name} connected`}
                 </span>
                 <span className="max-w-[280px] text-center text-[13px] text-aria-text-secondary">
-                  Your selected agents can now use {modalApp.name}. It&rsquo;ll
-                  appear in your dashboard shortly.
+                  {modalApp.connected
+                    ? `Agent access for ${modalApp.name} has been saved.`
+                    : `Your selected agents can now use ${modalApp.name}. It\u2019ll appear in your dashboard shortly.`}
                 </span>
                 <button
                   onClick={closeModal}

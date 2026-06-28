@@ -21,6 +21,7 @@ import {
 import {
   cacheVoiceContext,
   getActiveVoiceSession,
+  getCachedVoiceContext,
   getInFlightVoiceTurnResult,
   markVoiceIntroSpoken,
   registerInFlightVoiceTurnResult,
@@ -293,17 +294,21 @@ export async function POST(req: Request) {
         });
       }, KEEPALIVE_MS);
 
-      const workspaceCtx = await resolveWorkspaceContext(session.userId, {
-        request: req,
-      });
-      const ctx = await prepareAgentTurn({
-        userId: workspaceCtx.userId,
-        workspaceId: workspaceCtx.workspaceId,
-        ownerUserId: workspaceCtx.ownerUserId,
-        composioScope: getComposioScope(workspaceCtx),
-        agentId: session.agentId,
-        conversationId: session.conversationId,
-      });
+      let ctx = getCachedVoiceContext(session.conversationId);
+
+      if (!ctx) {
+        const workspaceCtx = await resolveWorkspaceContext(session.userId, {
+          request: req,
+        });
+        ctx = await prepareAgentTurn({
+          userId: workspaceCtx.userId,
+          workspaceId: workspaceCtx.workspaceId,
+          ownerUserId: workspaceCtx.ownerUserId,
+          composioScope: getComposioScope(workspaceCtx),
+          agentId: session.agentId,
+          conversationId: session.conversationId,
+        });
+      }
 
       if (isAborted()) {
         completeTurn(fullResponse);

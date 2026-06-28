@@ -45,6 +45,34 @@ export async function getElevenLabsSignedUrl(agentId: string): Promise<string> {
   return data.signed_url;
 }
 
+/**
+ * Requests a short-lived conversation token for WebRTC voice sessions (mobile).
+ */
+export async function getElevenLabsConversationToken(
+  agentId: string
+): Promise<string> {
+  const apiKey = await getPlatformSecret("elevenlabs.api_key");
+  if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not configured.");
+
+  const res = await fetch(
+    `${ELEVENLABS_API}/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`,
+    { headers: { "xi-api-key": apiKey } }
+  );
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to get ElevenLabs conversation token (${res.status}): ${detail}`
+    );
+  }
+
+  const data = (await res.json()) as { token?: string };
+  if (!data.token) {
+    throw new Error("ElevenLabs did not return a conversation token.");
+  }
+  return data.token;
+}
+
 export interface VoiceOverrides {
   agent: {
     prompt: { prompt: string };

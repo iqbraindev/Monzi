@@ -28,6 +28,11 @@ function toolLabel(part: ToolPart): string {
     return `create dashboard "${String(input.name)}"`;
   }
 
+  if (part.type.includes("create_watch") && input?.description) {
+    const desc = String(input.description);
+    return desc.length > 48 ? `${desc.slice(0, 45)}…` : desc;
+  }
+
   const name = part.type.replace(/^tool-/, "").replace(/_/g, " ");
   return name || "tool";
 }

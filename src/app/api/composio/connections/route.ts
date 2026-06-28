@@ -3,7 +3,9 @@ import { auth } from "@clerk/nextjs/server";
 import { getComposioScope } from "@/lib/composio/scope";
 import { listActiveConnections } from "@/lib/composio/tools";
 import { integrationNameFromToolkit } from "@/lib/composio/toolkits";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { resolveWorkspaceContext } from "@/lib/workspaces/context";
+import { resumeWatchesNeedingConnection } from "@/lib/watches/service";
 
 export async function GET(req: Request) {
   const { userId } = await auth();
@@ -21,6 +23,17 @@ export async function GET(req: Request) {
       name: integrationNameFromToolkit(account.toolkit?.slug ?? ""),
       status: account.status,
     }));
+
+    const supabase = getSupabaseAdmin();
+    for (const conn of connections) {
+      if (conn.toolkit) {
+        await resumeWatchesNeedingConnection(
+          supabase,
+          ctx.workspaceId,
+          conn.toolkit
+        );
+      }
+    }
 
     return Response.json({ connections });
   } catch (err) {

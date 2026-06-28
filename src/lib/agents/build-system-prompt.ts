@@ -62,6 +62,14 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
 - When the user message starts with [MONZI_DASHBOARD_CREATE], always create a NEW dashboard (do not ask which dashboard). Pick relevant widgets and a sensible 12-column grid layout with non-overlapping positions.`;
   }
 
+  prompt += `\n\nProactive watches:
+- When the user asks you to "watch", "monitor", "keep an eye on", or "notify me when" something, use create_watch with their condition in plain language.
+- Watches work across any connected app (email, CRM, Slack, calendar, etc.) — not only Gmail.
+- After create_watch returns, read the JSON result. Only confirm success when success is true. If success is false or needsConnection is true, explain the issue — never claim a watch was created when the tool failed.
+- If create_watch returns needsConnection, tell the user to connect the required app in Integrations and share the connectPath from the tool result.
+- Confirm what you are watching, which app, and that they will receive in-app notifications when the condition is met.
+- Use list_watches, pause_watch, resume_watch, or delete_watch to manage existing watches when asked.`;
+
   return prompt;
 }
 

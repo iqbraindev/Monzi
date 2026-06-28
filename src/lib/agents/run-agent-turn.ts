@@ -22,6 +22,7 @@ import type { ComposioScopeOptions } from "@/lib/composio/scope";
 import { getLangChainTools, listActiveConnections } from "@/lib/composio/tools";
 import { TOOLKIT_CATALOG } from "@/lib/composio/toolkits";
 import { getDashboardTools } from "@/lib/dashboard/tools";
+import { getWatchTools } from "@/lib/watches/tools";
 import { listDashboardSummaries } from "@/lib/dashboard/service";
 import { incrementWorkspaceTokenUsage } from "@/lib/billing/energy";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -122,6 +123,14 @@ export async function prepareAgentTurn(params: {
         })
       : {};
 
+  const watchTools = getWatchTools({
+    userId: params.userId,
+    workspaceId: params.workspaceId,
+    ownerUserId: params.ownerUserId,
+    composioScope: params.composioScope,
+    agentId: params.agentId,
+  });
+
   const composioAppNames = composioApps.map(
     (slug) => TOOLKIT_CATALOG[slug]?.name ?? slug
   );
@@ -139,7 +148,11 @@ export async function prepareAgentTurn(params: {
     workspaceId: params.workspaceId,
     ownerUserId: params.ownerUserId,
     composioApps,
-    aiTools: { ...composioAiTools, ...dashboardTools },
+    aiTools: {
+      ...composioAiTools,
+      ...dashboardTools,
+      ...(watchTools as unknown as Record<string, ReturnType<typeof tool>>),
+    },
     system,
     supabase,
   };

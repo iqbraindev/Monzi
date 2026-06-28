@@ -32,3 +32,10 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 CMD ["node", "server.js"]
+
+FROM base AS worker
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+CMD ["npx", "tsx", "src/workers/watch-poller.ts"]

@@ -5,12 +5,14 @@ import { Sidebar } from "@/components/aria/sidebar";
 import { CommandPalette } from "@/components/aria/command-palette";
 import { AgentAssistant } from "@/components/aria/agents/agent-assistant";
 import { AgentDashboardBridge } from "@/components/aria/dashboard/agent-dashboard-bridge";
+import { AgentInsightBar } from "@/components/aria/agents/agent-insight-bar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="aria-scope relative flex h-screen w-full flex-col overflow-hidden bg-aria-base font-sans text-[15px] text-aria-text antialiased">
       <AgentDashboardBridge />
       <Topbar />
+      <AgentInsightBar />
 
       <div className="relative flex min-h-0 flex-1">
         <Sidebar />

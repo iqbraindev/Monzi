@@ -16,6 +16,7 @@ import {
   getElevenLabsAgentId,
   getElevenLabsCustomLlmSecret,
   getElevenLabsSignedUrl,
+  getElevenLabsConversationToken,
 } from "@/lib/voice/elevenlabs";
 import {
   cacheVoiceContext,
@@ -85,6 +86,8 @@ export async function POST(req: Request) {
     }
 
     const signedUrl = await getElevenLabsSignedUrl(elevenLabsAgentId);
+    const conversationToken =
+      await getElevenLabsConversationToken(elevenLabsAgentId);
     const overrides = await buildVoiceOverrides(agent);
 
     const llmSecret = await getElevenLabsCustomLlmSecret();
@@ -123,6 +126,7 @@ export async function POST(req: Request) {
 
     return Response.json({
       signedUrl,
+      conversationToken,
       conversationId,
       overrides,
       agentName: agent.name,

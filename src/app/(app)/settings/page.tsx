@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSyncExternalStore } from "react";
 
 import {
+  loadNotificationPrefsFromServer,
   readSettingsPrefsServerSnapshot,
   readSettingsPrefsSnapshot,
   subscribeToSettingsPrefs,
@@ -58,6 +59,10 @@ export default function SettingsPage() {
   const { data: limitsData } = useLimits();
   const { data: workspacesData } = useWorkspaces();
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    void loadNotificationPrefsFromServer();
+  }, []);
 
   const activeWorkspaceId = limitsData?.workspaceId as string | undefined;
   const activeWorkspace = workspacesData?.workspaces.find(

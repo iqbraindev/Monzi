@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
-import { Menu, Search, Bell, LogOut } from "lucide-react";
+import { Menu, Search, LogOut } from "lucide-react";
+
+import { NotificationBell } from "@/components/aria/notifications/notification-bell";
 
 import { MonziLogo, MONZI_LOGO_APP_STYLE } from "@/components/brand/monzi-logo";
 import { cn } from "@/lib/utils";
@@ -123,13 +125,7 @@ export function Topbar() {
 
       {/* Right cluster */}
       <div className="flex shrink-0 items-center gap-2">
-        <button
-          aria-label="Notifications"
-          className="relative flex size-[38px] items-center justify-center rounded-full border border-aria-border bg-aria-surface text-aria-text-secondary transition-colors hover:bg-aria-elevated hover:text-aria-text"
-        >
-          <Bell className="size-[17px]" />
-          <span className="absolute top-2 right-[9px] size-[7px] rounded-full border-[1.5px] border-aria-base bg-aria-rose" />
-        </button>
+        <NotificationBell />
         <ProfileMenu />
       </div>
     </header>

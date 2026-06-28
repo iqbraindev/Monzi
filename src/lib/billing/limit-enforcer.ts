@@ -14,6 +14,7 @@ interface PackLimitRow {
   max_widgets_per_dashboard: number;
   max_integrations: number;
   max_subaccounts: number;
+  max_active_watches: number;
   ai_messages_per_month: number;
   ai_messages_per_day: number;
 }
@@ -35,6 +36,7 @@ async function getOwnerPackLimits(ownerUserId: string): Promise<PackLimitRow> {
     max_widgets_per_dashboard: 5,
     max_integrations: 1,
     max_subaccounts: 0,
+    max_active_watches: 2,
     ai_messages_per_month: 50,
     ai_messages_per_day: 10,
   };
@@ -46,7 +48,7 @@ async function getOwnerPackLimits(ownerUserId: string): Promise<PackLimitRow> {
   const { data: limits } = await supabase
     .from("pack_limits")
     .select(
-      "max_workspaces, max_agents, max_dashboards, max_widgets_per_dashboard, max_integrations, max_subaccounts, ai_messages_per_month, ai_messages_per_day"
+      "max_workspaces, max_agents, max_dashboards, max_widgets_per_dashboard, max_integrations, max_subaccounts, max_active_watches, ai_messages_per_month, ai_messages_per_day"
     )
     .eq("pack_id", subscription.pack_id)
     .maybeSingle();
@@ -231,6 +233,38 @@ export async function canConnectIntegration(
   return { ok: true };
 }
 
+export async function canCreateWatch(
+  workspaceId: string,
+  ownerUserId: string
+): Promise<{ ok: true } | { ok: false; error: LimitExceededError }> {
+  if (isDevUnlimited()) return { ok: true };
+
+  const limits = await getOwnerPackLimits(ownerUserId);
+  if (isUnlimited(limits.max_active_watches)) return { ok: true };
+
+  const supabase = getSupabaseAdmin();
+  const { count } = await supabase
+    .from("agent_watches")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", workspaceId)
+    .eq("status", "active");
+
+  const current = count ?? 0;
+  if (current >= limits.max_active_watches) {
+    return {
+      ok: false,
+      error: limitExceeded(
+        "max_active_watches",
+        current,
+        limits.max_active_watches,
+        `Active watch limit reached (${limits.max_active_watches}). Pause or delete a watch, or upgrade your plan.`
+      ),
+    };
+  }
+
+  return { ok: true };
+}
+
 export async function canCreateSubaccount(
   workspaceId: string,
   ownerUserId: string
@@ -277,6 +311,7 @@ export async function getWorkspaceLimitsSnapshot(
     dashboardCount,
     memberCount,
     connections,
+    activeWatchCount,
     usageRes,
   ] = await Promise.all([
     countOwnedWorkspaces(ownerUserId),
@@ -295,6 +330,11 @@ export async function getWorkspaceLimitsSnapshot(
       .eq("role", "member"),
     listActiveConnections(workspaceId, composioScope).catch(() => []),
     supabase
+      .from("agent_watches")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .eq("status", "active"),
+    supabase
       .from("usage_tracking")
       .select("ai_messages_used, integrations_connected, agents_created")
       .eq("workspace_id", workspaceId)
@@ -310,6 +350,7 @@ export async function getWorkspaceLimitsSnapshot(
       agents: agentCount.count ?? 0,
       dashboards: dashboardCount.count ?? 0,
       integrations: connections.length,
+      active_watches: activeWatchCount.count ?? 0,
       subaccounts: memberCount.count ?? 0,
       ai_messages_used: usageRes.data?.ai_messages_used ?? 0,
     },

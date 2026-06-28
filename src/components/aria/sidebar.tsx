@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Bot,
   Blocks,
+  Eye,
   Users,
   CreditCard,
   Settings,
@@ -27,6 +28,7 @@ interface NavItem {
 const NAV_MAIN: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Agents", href: "/agents", icon: Bot },
+  { label: "Watches", href: "/watches", icon: Eye },
   { label: "Integrations", href: "/integrations", icon: Blocks },
 ];
 

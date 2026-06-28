@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "dev:infra": "docker compose up -d postgres redis postgrest supabase-api",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "db:migrate:011": "docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d aria -f /migrations/011_subaccount_workspace_permissions.sql",
     "db:migrate:012": "powershell -Command \"Get-Content supabase/migrations/012_composio_catalog_apps.sql | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d aria\"",
+    "db:migrate:013": "powershell -Command \"Get-Content supabase/migrations/013_agent_watches.sql | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d aria\"",
+    "watch-worker": "tsx src/workers/watch-poller.ts",
+    "test:watches": "tsx --test src/lib/watches/**/*.test.ts src/lib/watches/*.test.ts",
     "db:reload-schema": "docker compose exec -T postgres psql -U postgres -d aria -c \"NOTIFY pgrst, 'reload schema';\" && docker compose restart postgrest supabase-api"
   },
   "dependencies": {
@@ -63,6 +67,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

@@ -37,6 +37,39 @@ export function writeNotificationPref(
     JSON.stringify({ ...current, [key]: enabled })
   );
   notifySettingsPrefsChanged();
+  void syncNotificationPrefsToServer({ [key]: enabled });
+}
+
+export async function syncNotificationPrefsToServer(
+  prefs: Partial<NotificationPrefs>
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    await fetch("/api/notifications/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(prefs),
+    });
+  } catch {
+    // Best-effort sync; localStorage remains source for UI
+  }
+}
+
+export async function loadNotificationPrefsFromServer(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const res = await fetch("/api/notifications/preferences");
+    if (!res.ok) return;
+    const data = (await res.json()) as { preferences?: NotificationPrefs };
+    if (!data.preferences) return;
+    window.localStorage.setItem(
+      NOTIFICATION_PREFS_STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_NOTIFICATION_PREFS, ...data.preferences })
+    );
+    notifySettingsPrefsChanged();
+  } catch {
+    // Ignore — use local defaults
+  }
 }
 
 const SETTINGS_PREFS_CHANGE_EVENT = "monzi:settings-prefs-changed";

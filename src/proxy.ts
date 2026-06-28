@@ -38,6 +38,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/elevenlabs/v1/chat/completions",
   "/api/user/sync-role(.*)",
 ]);
+const isApiRoute = createRouteMatcher(["/api(.*)"]);
 
 async function resolveOnboardingCompleted(
   userId: string,
@@ -83,6 +84,9 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   if (isPublicRoute(req)) return NextResponse.next();
+
+  // Mobile and other API clients expect JSON 401 from route handlers, not HTML redirects.
+  if (isApiRoute(req)) return NextResponse.next();
 
   if (!userId) {
     return NextResponse.redirect(new URL("/sign-in", req.url));

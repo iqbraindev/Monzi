@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { Menu, Shield, LogOut, ChevronDown } from "lucide-react";
 
+import { MonziLogo, MONZI_LOGO_APP_STYLE } from "@/components/brand/monzi-logo";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/store/ui-store";
 
@@ -109,12 +110,7 @@ export function AdminTopbar() {
           <Menu className="size-[18px]" />
         </button>
         <div className="flex items-center gap-2.5">
-          <span className="flex size-6 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
-            <Shield className="size-3.5" />
-          </span>
-          <span className="font-heading text-lg font-bold tracking-[0.04em] text-aria-text">
-            Monzi Admin
-          </span>
+          <MonziLogo href="/admin" style={MONZI_LOGO_APP_STYLE} />
           <span
             className={cn(
               "hidden rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-300 uppercase sm:inline"

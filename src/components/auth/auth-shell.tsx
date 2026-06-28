@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { MonziLogo, MONZI_LOGO_PROMO_STYLE } from "@/components/brand/monzi-logo";
 import { AuthPromoPanel } from "@/components/auth/auth-promo-panel";
 
 type AuthShellProps = {
@@ -34,12 +35,12 @@ export function AuthShell({
       <div className="relative flex min-h-screen flex-col lg:flex-row">
         <section className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 lg:px-16 xl:px-20">
           <div className="mx-auto w-full max-w-[420px]">
-            <Link
+            <MonziLogo
               href="/"
-              className="mb-8 inline-block font-heading text-lg font-bold tracking-tight text-aria-text transition-colors hover:text-aria-primary-light"
-            >
-              Monzi
-            </Link>
+              style={MONZI_LOGO_PROMO_STYLE}
+              className="mb-8"
+              fetchPriority="high"
+            />
 
             <h1 className="font-heading text-3xl font-bold tracking-tight text-aria-text sm:text-4xl">
               {title}

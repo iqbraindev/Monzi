@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { Menu, Search, Bell, LogOut } from "lucide-react";
 
+import { MonziLogo, MONZI_LOGO_APP_STYLE } from "@/components/brand/monzi-logo";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/store/ui-store";
 
@@ -100,12 +101,7 @@ export function Topbar() {
         >
           <Menu className="size-[18px]" />
         </button>
-        <div className="flex items-center gap-2.5">
-          <span className="aria-gradient aria-breathe size-6 rounded-full shadow-[0_0_16px_rgba(124,58,237,0.55)]" />
-          <span className="font-heading text-lg font-bold tracking-[0.04em] text-aria-text">
-            Monzi
-          </span>
-        </div>
+        <MonziLogo href="/dashboard" style={MONZI_LOGO_APP_STYLE} />
       </div>
 
       {/* Command bar */}

@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useState } from "react";
 
+import { MonziLogo, MONZI_LOGO_APP_STYLE } from "@/components/brand/monzi-logo";
 import { OnboardingProgress } from "@/components/onboarding/onboarding-progress";
 import { AgentStep } from "@/components/onboarding/steps/agent-step";
 import { ChatStep } from "@/components/onboarding/steps/chat-step";
@@ -31,9 +32,7 @@ export function OnboardingWizard({ initialState }: OnboardingWizardProps) {
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-aria-border bg-aria-surface/80 px-6 py-4 backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <span className="font-heading text-lg font-bold text-aria-text">
-            Monzi
-          </span>
+          <MonziLogo href="/dashboard" style={MONZI_LOGO_APP_STYLE} />
           <span className="text-xs text-aria-text-muted">Getting started</span>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Sora, Inter, JetBrains_Mono } from "next/font/google";
+import { MONZI_LOGO_ICON } from "@/components/brand/monzi-logo";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -48,6 +49,10 @@ export const metadata: Metadata = {
   title: "Monzi — AI Multi-Agent Assistant",
   description:
     "Create AI agents, connect your apps, and get a 360° dashboard view of your digital ecosystem.",
+  icons: {
+    icon: MONZI_LOGO_ICON,
+    apple: MONZI_LOGO_ICON,
+  },
 };
 
 export default function RootLayout({

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 
+import { MonziLogo, MONZI_LOGO_PROMO_STYLE } from "@/components/brand/monzi-logo";
 import { LandingNavLink } from "@/components/landing/smooth-scroll-link";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,13 +74,8 @@ export function LandingHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-aria-border/60 bg-aria-base/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          className="font-heading text-lg font-bold tracking-tight text-aria-text"
-        >
-          Monzi
-        </Link>
+      <div className="mx-auto flex min-h-[110px] max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <MonziLogo href="/" style={MONZI_LOGO_PROMO_STYLE} fetchPriority="high" />
 
         <nav className="hidden items-center gap-1 md:flex">
           {LANDING_NAV_LINKS.map((link) => (

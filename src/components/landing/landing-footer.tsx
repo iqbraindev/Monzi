@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { MonziLogo, MONZI_LOGO_PROMO_STYLE } from "@/components/brand/monzi-logo";
 import { SmoothScrollLink } from "@/components/landing/smooth-scroll-link";
 import { LANDING_NAV_LINKS } from "@/lib/marketing/landing-nav";
 
@@ -10,7 +11,7 @@ export function LandingFooter() {
     <footer className="border-t border-aria-border/60 bg-aria-surface/50 px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
         <div className="text-center sm:text-left">
-          <p className="font-heading text-lg font-bold text-aria-text">Monzi</p>
+          <MonziLogo href="/" style={{ width: "auto", height: 56 }} />
           <p className="mt-1 text-sm text-aria-text-muted">
             AI multi-agent personal & business assistant
           </p>

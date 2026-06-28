@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { MonziLogo, MONZI_LOGO_APP_STYLE } from "@/components/brand/monzi-logo";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/store/ui-store";
 
@@ -80,14 +81,21 @@ export function AdminSidebar() {
       className="relative z-20 flex shrink-0 flex-col overflow-hidden border-r border-amber-500/15 bg-[#0c0c12] transition-[width] duration-200 ease-out"
       style={{ width: collapsed ? 68 : 240 }}
     >
-      <div className="flex min-h-[54px] items-center gap-2.5 px-3.5 pt-4 pb-2.5">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[13px] font-semibold text-amber-300">
-          SA
-        </span>
+      <div
+        className={cn(
+          "flex min-h-[54px] items-center gap-2.5 px-3.5 pt-4 pb-2.5",
+          !expanded && "justify-center px-2"
+        )}
+      >
+        <MonziLogo
+          href="/admin"
+          style={expanded ? MONZI_LOGO_APP_STYLE : { width: "auto", height: 24 }}
+          className={cn("shrink-0", !expanded && "max-w-[44px]")}
+        />
         {expanded && (
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-[13px] font-semibold text-aria-text">
-              Monzi Admin
+              Admin
             </span>
             <span className="truncate text-[11px] text-amber-400/80">
               Super Admin Console

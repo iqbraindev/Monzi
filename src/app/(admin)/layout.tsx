@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { SuperAdminSync } from "@/components/auth/super-admin-sync";
 import { getClerkUserRole } from "@/lib/auth/super-admin";
-import { syncSuperAdminRole } from "@/lib/users/provision";
+import { ensureSupabaseUser, syncSuperAdminRole } from "@/lib/users/provision";
 
 export default async function AdminRootLayout({
   children,
@@ -14,6 +14,7 @@ export default async function AdminRootLayout({
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
+  await ensureSupabaseUser(userId);
   await syncSuperAdminRole(userId);
 
   const role = await getClerkUserRole(userId);

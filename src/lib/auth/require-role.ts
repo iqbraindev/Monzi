@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { resolveUserRole } from "@/lib/auth/resolve-role";
+import { ensureSupabaseUser } from "@/lib/users/provision";
 
 type AuthResult =
   | { userId: string; role: string; error?: never }
@@ -21,5 +22,6 @@ export async function requireSuperAdmin(): Promise<AuthResult> {
   if (result.role !== "super_admin") {
     return { error: Response.json({ error: "Forbidden" }, { status: 403 }) };
   }
+  await ensureSupabaseUser(result.userId);
   return result;
 }

@@ -94,14 +94,14 @@ export async function executeTool(
   }
 }
 
-/** Initiate OAuth using workspace-scoped Composio entity. */
+/** Start OAuth via Composio hosted link (workspace-scoped entity). */
 export async function initiateConnection(
   workspaceId: string,
   authConfigId: string,
   callbackUrl: string
 ) {
   const composio = await getComposio();
-  return composio.connectedAccounts.initiate(
+  return composio.connectedAccounts.link(
     getComposioEntityId(workspaceId),
     authConfigId,
     { callbackUrl }

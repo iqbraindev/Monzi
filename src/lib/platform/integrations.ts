@@ -3,6 +3,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { getOpenRouterRequestHeaders } from "@/lib/ai/openrouter";
 import { getFieldStatus, getPlatformSecret, getPlatformSetting, setPlatformSecret, setPlatformSetting } from "@/lib/platform/config";
 import { getRedis } from "@/lib/redis/client";
+import { getStripe } from "@/lib/stripe/client";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export type IntegrationFieldType = "secret" | "text";
@@ -285,8 +286,7 @@ export async function testIntegrationProvider(
     case "stripe": {
       const key = await getPlatformSecret("stripe.secret_key");
       if (!isRealValue(key)) return { ok: false, error: "Secret key not configured" };
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(key!, { apiVersion: "2026-05-27.dahlia", typescript: true });
+      const stripe = await getStripe();
       await stripe.balance.retrieve();
       return { ok: true };
     }

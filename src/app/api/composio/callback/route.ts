@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getAppPublicBaseUrl } from "@/lib/composio/client";
+
 export async function GET(req: NextRequest) {
   const toolkit =
     req.nextUrl.searchParams.get("toolkit") ??
@@ -11,7 +13,7 @@ export async function GET(req: NextRequest) {
     ? decodeURIComponent(returnCookie)
     : "/integrations";
 
-  const redirectTo = new URL(returnPath, req.url);
+  const redirectTo = new URL(returnPath, `${getAppPublicBaseUrl()}/`);
   if (toolkit) redirectTo.searchParams.set("connected", toolkit);
 
   const response = NextResponse.redirect(redirectTo);

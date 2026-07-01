@@ -52,7 +52,26 @@ export async function getComposioLangChain() {
   return composioLangChainClient;
 }
 
+const COMPOSIO_PUBLIC_BASE = "https://dev.monzi.ai";
+
+const LOCAL_APP_URL =
+  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i;
+
+function resolvePublicAppBase(): string {
+  const fromEnv =
+    process.env.COMPOSIO_PUBLIC_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (fromEnv && !LOCAL_APP_URL.test(fromEnv)) {
+    return fromEnv.replace(/\/$/, "");
+  }
+  return COMPOSIO_PUBLIC_BASE;
+}
+
+/** Public app origin for Composio OAuth — never localhost. */
+export function getAppPublicBaseUrl(): string {
+  return resolvePublicAppBase();
+}
+
 export function getAppCallbackUrl(path: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://monzi.martek.cloud";
-  return `${base.replace(/\/$/, "")}${path}`;
+  return `${resolvePublicAppBase()}${path}`;
 }

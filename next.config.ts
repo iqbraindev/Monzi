@@ -31,6 +31,8 @@ function parseAllowedDevOrigins(): string[] {
 const nextConfig: NextConfig = {
   output: "standalone",
   allowedDevOrigins: parseAllowedDevOrigins(),
+  // Hide the Next.js "N" badge in local dev so the UI matches production.
+  devIndicators: false,
 };
 
 export default nextConfig;

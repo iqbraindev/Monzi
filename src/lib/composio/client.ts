@@ -52,8 +52,6 @@ export async function getComposioLangChain() {
   return composioLangChainClient;
 }
 
-const COMPOSIO_PUBLIC_BASE = "https://dev.monzi.ai";
-
 const LOCAL_APP_URL =
   /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i;
 
@@ -64,7 +62,9 @@ function resolvePublicAppBase(): string {
   if (fromEnv && !LOCAL_APP_URL.test(fromEnv)) {
     return fromEnv.replace(/\/$/, "");
   }
-  return COMPOSIO_PUBLIC_BASE;
+  throw new Error(
+    "COMPOSIO_PUBLIC_BASE_URL (or a non-local NEXT_PUBLIC_APP_URL) must be set for Composio OAuth redirects"
+  );
 }
 
 /** Public app origin for Composio OAuth — never localhost. */

@@ -88,6 +88,8 @@ OPENROUTER_TTS_MODEL=sesame/csm-1b
 # ─────────────────────────────────────────
 COMPOSIO_API_KEY=xxx
 NEXT_PUBLIC_COMPOSIO_CLIENT_ID=xxx
+# Public origin for OAuth callbacks (never localhost). Example: https://dev2.monzi.ai
+COMPOSIO_PUBLIC_BASE_URL=https://dev2.monzi.ai
 
 # ─────────────────────────────────────────
 # STRIPE — Billing
